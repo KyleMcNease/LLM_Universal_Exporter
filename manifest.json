@@ -1,0 +1,113 @@
+{
+  "manifest_version": 3,
+  "name": "Universal AI Exporter",
+  "version": "1.0.0",
+  "description": "Export conversations from Claude, ChatGPT, Gemini, and other AI platforms. Privacy-first with advanced research features.",
+  
+  "permissions": [
+    "activeTab",
+    "storage",
+    "downloads"
+  ],
+  
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chat.openai.com/*",
+    "https://gemini.google.com/*",
+    "https://bard.google.com/*",
+    "https://perplexity.ai/*",
+    "https://poe.com/*",
+    "https://character.ai/*",
+    "https://www.bing.com/chat/*",
+    "https://grok.x.ai/*",
+    "https://x.com/*",
+    "https://manus.im/*",
+    "https://llama.meta.com/*",
+    "https://huggingface.co/*",
+    "https://deepseek.com/*",
+    "https://qwen.aliyun.com/*",
+    "https://devin.ai/*"
+  ],
+  
+  "background": {
+    "service_worker": "background.js"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*",
+        "https://bard.google.com/*",
+        "https://perplexity.ai/*",
+        "https://poe.com/*",
+        "https://character.ai/*",
+        "https://www.bing.com/chat/*",
+        "https://grok.x.ai/*",
+        "https://x.com/*",
+        "https://manus.im/*",
+        "https://llama.meta.com/*",
+        "https://huggingface.co/*",
+        "https://deepseek.com/*",
+        "https://qwen.aliyun.com/*",
+        "https://devin.ai/*"
+      ],
+      "js": [
+        "libs/jspdf.umd.min.js",
+        "libs/html2canvas.min.js",
+        "libs/marked.min.js",
+        "core/platform-detector.js",
+        "extractors/universal-extractor.js",
+        "extractors/claude-extractor.js",
+        "extractors/chatgpt-extractor.js",
+        "extractors/gemini-extractor.js",
+        "extractors/perplexity-extractor.js",
+        "extractors/poe-extractor.js",
+        "extractors/character-extractor.js",
+        "extractors/bing-extractor.js",
+        "extractors/grok-extractor.js",
+        "extractors/manus-extractor.js",
+        "extractors/llama-extractor.js",
+        "extractors/deepseek-extractor.js",
+        "extractors/qwen3-extractor.js",
+        "extractors/devin-extractor.js",
+        "ui/export-interface.js",
+        "content-script.js"
+      ],
+      "css": [
+        "ui/export-styles.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Universal AI Exporter",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "ui/export-interface.html",
+        "ui/export-styles.css",
+        "icons/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

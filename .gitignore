@@ -1,0 +1,206 @@
+# Universal AI Exporter - Production .gitignore
+# ==============================================
+
+# System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# Development and build
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+.cache/
+.temp/
+.tmp/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.sublime-project
+.sublime-workspace
+
+# Environment and config
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+.nyc_output
+
+# Testing
+.jest/
+test-results/
+screenshots/
+
+# Browser extension specific
+*.crx
+*.zip
+*.pem
+extension.key
+extension.pub
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Documentation that shouldn't be in repo
+*not for github*
+*Not for github*
+*NOT FOR GITHUB*
+Build-plan not for github.md
+Next Chat Session Testing Directions not for github.m
+
+# Sensitive data
+secrets/
+keys/
+certificates/
+*.p12
+*.pfx
+
+# Release and distribution
+releases/
+packages/
+*.tar.gz
+
+# Browser-specific
+.chrome/
+.firefox/
+.edge/
+
+# Development notes and personal files
+TODO.md
+NOTES.md
+PERSONAL.md
+PRIVATE.md
+
+# Backup files
+*.bak
+*.backup
+backup/
+backups/
+
+# Archives
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Dependency directories
+bower_components/
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+.dynamodb/
+.vuepress/dist
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Development database
+*.db
+*.sqlite
+*.sqlite3
+
+# MacOS
+*.dmg
+
+# Windows
+*.exe
+*.msi
+
+# Linux
+*.AppImage
+*.deb
+*.rpm
+
+# Lock files (keep package-lock.json for reproducible builds)
+# package-lock.json  # Uncomment if you want to ignore lock files
+# yarn.lock
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.history/
+.ionide/
+
+# End of Universal AI Exporter .gitignore

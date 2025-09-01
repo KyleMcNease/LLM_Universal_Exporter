@@ -1,0 +1,163 @@
+{
+  "name": "universal-ai-exporter",
+  "version": "1.0.0",
+  "description": "Universal browser extension for exporting AI conversations from Claude, ChatGPT, Gemini, and other platforms with advanced research features",
+  "main": "background.js",
+  "scripts": {
+    "build": "npm run clean && npm run copy-files && npm run download-libs",
+    "clean": "rm -rf dist && mkdir -p dist",
+    "copy-files": "npm run copy-extension && npm run copy-icons && npm run copy-libs",
+    "copy-extension": "cp -r extension/* dist/",
+    "copy-icons": "npm run generate-icons",
+    "generate-icons": "node scripts/generate-icons.js",
+    "copy-libs": "mkdir -p dist/libs && cp libs/* dist/libs/", 
+    "download-libs": "npm run download-jspdf && npm run download-html2canvas && npm run download-marked",
+    "download-jspdf": "curl -o libs/jspdf.umd.min.js https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
+    "download-html2canvas": "curl -o libs/html2canvas.min.js https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
+    "download-marked": "curl -o libs/marked.min.js https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js",
+    "package": "npm run build && cd dist && zip -r ../universal-ai-exporter-v1.0.0.zip .",
+    "dev": "npm run build && npm run watch",
+    "watch": "chokidar \"extension/**/*\" -c \"npm run copy-extension\"",
+    "test": "npm run test-lint && npm run test-security",
+    "test-lint": "eslint extension/ --ext .js",
+    "test-security": "node scripts/security-check.js",
+    "release": "npm run test && npm run package && npm run generate-release-notes",
+    "generate-release-notes": "node scripts/generate-release-notes.js",
+    "install-deps": "npm install && mkdir -p dist/libs",
+    "setup": "npm run install-deps && npm run build",
+    "validate": "node scripts/validate-manifest.js && npm run test"
+  },
+  "keywords": [
+    "ai",
+    "export",
+    "claude",
+    "chatgpt",
+    "gemini",
+    "browser-extension",
+    "chrome-extension",
+    "conversation",
+    "pdf",
+    "markdown",
+    "research",
+    "thinking-blocks",
+    "privacy-first"
+  ],
+  "author": {
+    "name": "Universal AI Exporter Team",
+    "email": "team@universalaiexporter.com",
+    "url": "https://universalaiexporter.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/universal-ai-exporter/extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/universal-ai-exporter/extension/issues"
+  },
+  "homepage": "https://universalaiexporter.com",
+  "devDependencies": {
+    "eslint": "^8.50.0",
+    "chokidar-cli": "^3.0.0",
+    "canvas": "^2.11.2",
+    "sharp": "^0.32.6"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "browserslist": [
+    "last 2 Chrome versions",
+    "last 2 Edge versions",
+    "last 2 Firefox versions"
+  ],
+  "manifest": {
+    "target_browsers": [
+      "chrome",
+      "edge",
+      "firefox",
+      "safari"
+    ],
+    "permissions_required": [
+      "activeTab",
+      "storage",
+      "downloads"
+    ],
+    "content_security_policy": "script-src 'self'; object-src 'self'"
+  },
+  "build": {
+    "output_dir": "dist",
+    "source_maps": false,
+    "minify": false,
+    "include_dev_tools": false
+  },
+  "release": {
+    "chrome_web_store": {
+      "app_id": "",
+      "client_id": "",
+      "refresh_token": ""
+    },
+    "firefox_addons": {
+      "api_key": "",
+      "api_secret": ""
+    },
+    "edge_addons": {
+      "client_id": "",
+      "access_token": ""
+    }
+  },
+  "pricing": {
+    "model": "freemium",
+    "free_tier": {
+      "exports_per_day": 10,
+      "formats": ["markdown", "json", "csv", "txt"],
+      "thinking_blocks": true
+    },
+    "pro_tier": {
+      "price_monthly": 4.99,
+      "price_annual": 49.99,
+      "exports_per_day": "unlimited",
+      "formats": ["all"],
+      "premium_pdf": true,
+      "research_archive": true,
+      "priority_support": true
+    }
+  },
+  "features": {
+    "supported_platforms": [
+      "claude.ai",
+      "chat.openai.com", 
+      "gemini.google.com",
+      "bard.google.com",
+      "perplexity.ai",
+      "poe.com",
+      "character.ai",
+      "bing.com/chat",
+      "grok.x.ai",
+      "manus.im",
+      "llama.meta.com",
+      "deepseek.com",
+      "qwen.aliyun.com",
+      "devin.ai"
+    ],
+    "export_formats": [
+      "pdf",
+      "markdown", 
+      "json",
+      "csv",
+      "html",
+      "txt",
+      "research_archive"
+    ],
+    "advanced_features": [
+      "thinking_block_detection",
+      "code_block_preservation",
+      "mathematical_expression_capture",
+      "multimodal_content_support",
+      "complete_html_archival",
+      "conversation_analytics",
+      "privacy_first_architecture"
+    ]
+  }
+}
