@@ -6,15 +6,33 @@ const fs = require('fs');
 const path = require('path');
 
 // Source image (place your source icon.png in icons/source-icon.png)
-const sourcePath = path.join(__dirname, '../icons/source-icon.png');
-const outputDir = path.join(__dirname, '../icons');
+const outputDir = path.join(__dirname, '../extension/icons');
+const sourceCandidates = [
+    'source-icon.png',
+    'icon512.png',
+    'icon384.png',
+    'icon256.png',
+    'icon128.png'
+];
+
+function resolveSourceIcon() {
+    for (const candidate of sourceCandidates) {
+        const candidatePath = path.join(outputDir, candidate);
+        if (fs.existsSync(candidatePath)) {
+            return candidatePath;
+        }
+    }
+    return null;
+}
 
 // Sizes needed (per manifest.json)
 const sizes = [16, 32, 48, 128];
 
 async function generateIcons() {
-    if (!fs.existsSync(sourcePath)) {
-        console.error('Source icon not found at', sourcePath);
+    const sourcePath = resolveSourceIcon();
+
+    if (!sourcePath) {
+        console.error('Source icon not found in', outputDir);
         process.exit(1);
     }
 

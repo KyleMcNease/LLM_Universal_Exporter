@@ -25,7 +25,43 @@
     };
     
     // Browser API polyfill for multi-browser support
-    const extApi = chrome || browser;
+    const extApi = typeof chrome !== 'undefined'
+        ? chrome
+        : (typeof browser !== 'undefined' ? browser : null);
+
+    // Lightweight resource manager to avoid dangling timers
+    const resourceManager = {
+        timers: new Set(),
+        intervals: new Set(),
+        addTimer(id) {
+            if (typeof id === 'number') {
+                this.timers.add(id);
+            }
+        },
+        clearTimer(id) {
+            if (this.timers.has(id)) {
+                clearTimeout(id);
+                this.timers.delete(id);
+            }
+        },
+        addInterval(id) {
+            if (typeof id === 'number') {
+                this.intervals.add(id);
+            }
+        },
+        clearInterval(id) {
+            if (this.intervals.has(id)) {
+                clearInterval(id);
+                this.intervals.delete(id);
+            }
+        },
+        clearAll() {
+            this.timers.forEach((timerId) => clearTimeout(timerId));
+            this.intervals.forEach((intervalId) => clearInterval(intervalId));
+            this.timers.clear();
+            this.intervals.clear();
+        }
+    };
     
     // Global state
     let exportInterface = null;
@@ -51,10 +87,10 @@
                 console.log('⏰ Dynamic content wait completed');
             }, 1000);
             resourceManager.addTimer(dynamicContentTimer);
-            
+
             await new Promise(resolve => {
                 setTimeout(() => {
-                    resourceManager.timers.delete(dynamicContentTimer);
+                    resourceManager.clearTimer(dynamicContentTimer);
                     resolve();
                 }, 1000);
             });
@@ -103,20 +139,22 @@
      */
     function setupActivationTriggers() {
         // Listen for extension messages using polyfill
-        extApi.runtime?.onMessage?.addListener((request, sender, sendResponse) => {
-            if (request.action === 'activate_exporter') {
-                showExportInterface();
-                sendResponse({ success: true });
-            }
-            
-            if (request.action === 'get_status') {
-                sendResponse({
-                    initialized: isInitialized,
-                    platform: platformDetector?.currentPlatform || null,
-                    version: CONFIG.version
-                });
-            }
-        });
+        if (extApi?.runtime?.onMessage?.addListener) {
+            extApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
+                if (request.action === 'activate_exporter') {
+                    showExportInterface();
+                    sendResponse({ success: true });
+                }
+
+                if (request.action === 'get_status') {
+                    sendResponse({
+                        initialized: isInitialized,
+                        platform: platformDetector?.currentPlatform || null,
+                        version: CONFIG.version
+                    });
+                }
+            });
+        }
         
         // Listen for custom events
         document.addEventListener('universalExporterActivate', () => {
@@ -340,18 +378,24 @@
         }
         
         // Privacy check: Get anonymize toggle from storage
-        extApi.storage.sync.get('anonymizeData', (result) => {
-            if (result.anonymizeData) {
-                console.log('🔒 Anonymizing data before export');
-                // Anonymize logic would go here if needed
-            }
-            
-            // Initialize and show interface
+        const storageSync = extApi?.storage?.sync;
+        if (storageSync?.get) {
+            storageSync.get('anonymizeData', (result = {}) => {
+                if (result.anonymizeData) {
+                    console.log('🔒 Anonymizing data before export');
+                }
+
+                exportInterface.initialize().catch(error => {
+                    console.error('❌ Failed to show export interface:', error);
+                    showErrorNotification('Failed to initialize export interface: ' + error.message);
+                });
+            });
+        } else {
             exportInterface.initialize().catch(error => {
                 console.error('❌ Failed to show export interface:', error);
                 showErrorNotification('Failed to initialize export interface: ' + error.message);
             });
-        });
+        }
         
         // Analytics/tracking (if enabled)
         trackEvent('interface_shown', {
@@ -437,6 +481,7 @@
         console.log('🧹 Universal AI Exporter cleanup');
         
         // Cleanup any resources
+        resourceManager.clearAll();
         if (exportInterface) {
             exportInterface.hideUI();
         }
@@ -459,8 +504,9 @@
             showExportInterface,
             platformDetector,
             exportInterface,
+            resourceManager,
             config: CONFIG
         };
     }
-    
+
 })();

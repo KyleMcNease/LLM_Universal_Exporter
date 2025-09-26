@@ -356,7 +356,7 @@ class ExportInterface {
             for (let i = 0; i < this.exportData.messages.length; i += batchSize) {
                 const batch = this.exportData.messages.slice(i, i + batchSize);
                 
-                for (const [batchIndex, message] of batch.entries()) {
+                for (const message of batch) {
                     // Check if we need a new page
                     if (yPosition > 250) {
                         doc.addPage();

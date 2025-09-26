@@ -207,6 +207,30 @@ class PlatformDetector {
         this.detectionAttempts = new Map();
         this.lastSuccessfulVersion = new Map();
     }
+
+    isValidSelector(selector) {
+        return typeof selector === 'string' && selector.trim().length > 0;
+    }
+
+    safeQuerySelector(selector, context = document) {
+        if (!this.isValidSelector(selector)) return null;
+        try {
+            return context.querySelector(selector);
+        } catch (error) {
+            console.warn('⚠️ Invalid selector encountered during detection:', selector, error);
+            return null;
+        }
+    }
+
+    safeQuerySelectorAll(selector, context = document) {
+        if (!this.isValidSelector(selector)) return [];
+        try {
+            return Array.from(context.querySelectorAll(selector));
+        } catch (error) {
+            console.warn('⚠️ Invalid selector encountered during detection (all):', selector, error);
+            return [];
+        }
+    }
     
     detectPlatform() {
         const hostname = window.location.hostname;
@@ -263,11 +287,11 @@ class PlatformDetector {
         for (const version of versionOrder) {
             try {
                 const selectors = versions[version];
-                const conversationEl = document.querySelector(selectors.conversation);
-                
+                const conversationEl = this.safeQuerySelector(selectors.conversation);
+
                 if (conversationEl) {
                     // Verify we can find messages too
-                    const messages = document.querySelectorAll(selectors.messages);
+                    const messages = this.safeQuerySelectorAll(selectors.messages);
                     if (messages.length > 0) {
                         // Success! Remember this version
                         this.lastSuccessfulVersion.set(attemptKey, version);
@@ -304,8 +328,8 @@ class PlatformDetector {
     legacyDetection(platformName, hostname, pathname) {
         try {
             const platform = this.platforms[platformName];
-            const conversationExists = document.querySelector(platform.selectors.conversation);
-            
+            const conversationExists = this.safeQuerySelector(platform.selectors.conversation);
+
             if (conversationExists) {
                 this.currentPlatform = platformName;
                 this.detectionResult = {
@@ -336,9 +360,9 @@ class PlatformDetector {
             '.human-message, .ai-message',
             '[data-message], [data-role]'
         ];
-        
+
         for (const pattern of chatPatterns) {
-            const elements = document.querySelectorAll(pattern);
+            const elements = this.safeQuerySelectorAll(pattern);
             if (elements.length >= 2) {
                 // Heuristic backups: text patterns
                 const bodyText = document.body.innerText;
@@ -452,15 +476,17 @@ class PlatformDetector {
         }
         
         // Show error notification
-        try {
-            chrome.notifications.create({
-                type: 'basic',
-                iconUrl: 'icons/icon48.png',
-                title: 'Detection Failed',
-                message: `No supported platform detected after ${maxAttempts} attempts.`
-            });
-        } catch (notifError) {
-            console.warn('⚠️ Could not show notification:', notifError);
+        if (typeof chrome !== 'undefined' && chrome?.notifications?.create) {
+            try {
+                chrome.notifications.create({
+                    type: 'basic',
+                    iconUrl: 'icons/icon48.png',
+                    title: 'Detection Failed',
+                    message: `No supported platform detected after ${maxAttempts} attempts.`
+                });
+            } catch (notifError) {
+                console.warn('⚠️ Could not show notification:', notifError);
+            }
         }
         
         const error = new Error(`Platform detection timeout after ${maxAttempts} attempts`);

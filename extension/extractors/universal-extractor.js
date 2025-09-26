@@ -6,7 +6,7 @@
 class UniversalExtractor {
     constructor(platformConfig) {
         this.platform = platformConfig?.platform || 'unknown';
-        this.selectors = platformConfig?.selectors || {};
+        this.selectors = { ...(platformConfig?.selectors || {}) };
         this.config = platformConfig || {};
         this.version = '1.0.0';
         this.timestamp = new Date().toISOString();
@@ -31,7 +31,43 @@ class UniversalExtractor {
             }
         };
     }
-    
+
+    isValidSelector(selector) {
+        return typeof selector === 'string' && selector.trim().length > 0;
+    }
+
+    getSelector(selector) {
+        return this.isValidSelector(selector) ? selector.trim() : null;
+    }
+
+    safeQuerySelector(selector, context = document) {
+        const validSelector = this.getSelector(selector);
+        if (!validSelector) return null;
+        try {
+            return context.querySelector(validSelector);
+        } catch (error) {
+            console.warn('⚠️ Invalid selector during extraction:', validSelector, error);
+            return null;
+        }
+    }
+
+    safeQuerySelectorAll(selector, context = document) {
+        const validSelector = this.getSelector(selector);
+        if (!validSelector) return [];
+        try {
+            return Array.from(context.querySelectorAll(validSelector));
+        } catch (error) {
+            console.warn('⚠️ Invalid selector during extraction (all):', validSelector, error);
+            return [];
+        }
+    }
+
+    truncate(text, length = 100) {
+        if (typeof text !== 'string') return null;
+        if (text.length <= length) return text;
+        return `${text.substring(0, length)}...`;
+    }
+
     async extractConversation(options = {}) {
         try {
             console.log('🚀 Starting Universal AI Exporter extraction...', {
@@ -95,37 +131,51 @@ class UniversalExtractor {
             userMessages: [],
             assistantMessages: []
         };
-        
-        elements.conversation = document.querySelector(this.selectors.conversation);
+
+        elements.conversation = this.safeQuerySelector(this.selectors.conversation);
         if (!elements.conversation) {
             throw new Error('Conversation container not found');
         }
-        
-        elements.messages = Array.from(document.querySelectorAll(this.selectors.messages));
-        
+
+        elements.messages = this.safeQuerySelectorAll(this.selectors.messages, elements.conversation);
+        if (elements.messages.length === 0) {
+            elements.messages = this.safeQuerySelectorAll(this.selectors.messages);
+        }
+
         if (this.selectors.thinkingBlocks) {
-            const thinkingSelectors = this.selectors.thinkingBlocks.split(',').map(s => s.trim());
+            const thinkingSelectors = this.selectors.thinkingBlocks
+                .split(',')
+                .map(s => s.trim())
+                .filter(s => this.isValidSelector(s));
             for (const selector of thinkingSelectors) {
-                const blocks = Array.from(document.querySelectorAll(selector));
+                const blocks = this.safeQuerySelectorAll(selector, elements.conversation);
                 elements.thinkingBlocks.push(...blocks);
             }
             elements.thinkingBlocks = [...new Set(elements.thinkingBlocks)];
         }
-        
-        elements.userMessages = Array.from(document.querySelectorAll(this.selectors.userMessages || ''));
-        elements.assistantMessages = Array.from(document.querySelectorAll(this.selectors.assistantMessages || ''));
-        
+
+        if (this.isValidSelector(this.selectors.userMessages)) {
+            elements.userMessages = this.safeQuerySelectorAll(this.selectors.userMessages, elements.conversation);
+        }
+
+        if (this.isValidSelector(this.selectors.assistantMessages)) {
+            elements.assistantMessages = this.safeQuerySelectorAll(this.selectors.assistantMessages, elements.conversation);
+        }
+
         console.log('📊 Elements discovered:', {
             messages: elements.messages.length,
             thinkingBlocks: elements.thinkingBlocks.length,
             userMessages: elements.userMessages.length,
             assistantMessages: elements.assistantMessages.length
         });
-        
+
         return elements;
     }
-    
+
     async expandElements(elements) {
+        if (!Array.isArray(elements.thinkingBlocks) || elements.thinkingBlocks.length === 0) {
+            return;
+        }
         console.log(`🔄 Expanding ${elements.thinkingBlocks.length} thinking blocks...`);
         
         for (let i = 0; i < elements.thinkingBlocks.length; i++) {
@@ -177,7 +227,11 @@ class UniversalExtractor {
         this.exportData.metadata.messageCount = elements.messages.length;
         this.exportData.metadata.thinkingBlockCount = elements.thinkingBlocks.length;
         this.exportData.metadata.hasThinkingBlocks = elements.thinkingBlocks.length > 0;
-        
+
+        if (elements.messages.length === 0) {
+            throw new Error('No messages found during extraction');
+        }
+
         // Chunked message extraction
         const batchSize = 20;
         for (let i = 0; i < elements.messages.length; i += batchSize) {
@@ -203,7 +257,7 @@ class UniversalExtractor {
     extractMessage(msgEl, index) {
         const author = this.determineAuthor(msgEl);
         const content = this.getTextContent(msgEl);
-        
+
         if (!content.trim()) {
             return null;
         }
@@ -247,21 +301,24 @@ class UniversalExtractor {
         const embedded = [];
         
         if (this.selectors.thinkingBlocks) {
-            const thinkingSelectors = this.selectors.thinkingBlocks.split(',').map(s => s.trim());
-            
+            const thinkingSelectors = this.selectors.thinkingBlocks
+                .split(',')
+                .map(s => s.trim())
+                .filter(s => this.isValidSelector(s));
+
             const thinkingRegex = /Thinking:\s*([\s\S]*?)(?=User:|Assistant:|$)/i; // Heuristic for open-source
             const match = msgEl.textContent.match(thinkingRegex);
             if (match) {
                 embedded.push({
                     id: 'embedded_thinking_regex',
                     content: match[1].trim(),
-                    html: '', // No HTML for regex fallback
+                    html: '',
                     expanded: true
                 });
             }
-            
+
             for (const selector of thinkingSelectors) {
-                const blocks = msgEl.querySelectorAll(selector);
+                const blocks = this.safeQuerySelectorAll(selector, msgEl);
                 blocks.forEach((block, index) => {
                     const content = this.getTextContent(block);
                     if (content.trim()) {
@@ -275,16 +332,16 @@ class UniversalExtractor {
                 });
             }
         }
-        
+
         return embedded;
     }
-    
+
     determineAuthor(msgEl) {
-        if (msgEl.matches(this.selectors.userMessages || '')) {
+        if (this.isValidSelector(this.selectors.userMessages) && msgEl.matches(this.selectors.userMessages)) {
             return 'user';
         }
         
-        if (msgEl.matches(this.selectors.assistantMessages || '')) {
+        if (this.isValidSelector(this.selectors.assistantMessages) && msgEl.matches(this.selectors.assistantMessages)) {
             return 'assistant';
         }
         
@@ -296,7 +353,7 @@ class UniversalExtractor {
             return authorAttr.toLowerCase().includes('user') ? 'user' : 'assistant';
         }
         
-        const text = msgEl.textContent.toLowerCase();
+        const text = (msgEl.textContent || '').toLowerCase();
         if (text.includes('you:') || text.includes('user:')) {
             return 'user';
         }
@@ -312,9 +369,10 @@ class UniversalExtractor {
     }
     
     getTextContent(element) {
+        if (!element) return '';
         return element.innerText || element.textContent || '';
     }
-    
+
     extractTimestamp(msgEl) {
         const timeSelectors = [
             'time', '.timestamp', '[data-timestamp]', 
@@ -322,7 +380,7 @@ class UniversalExtractor {
         ];
         
         for (const selector of timeSelectors) {
-            const timeEl = msgEl.querySelector(selector);
+            const timeEl = this.safeQuerySelector(selector, msgEl);
             if (timeEl) {
                 const time = timeEl.getAttribute('datetime') || 
                            timeEl.getAttribute('data-timestamp') ||
@@ -349,9 +407,12 @@ class UniversalExtractor {
         this.exportData.metadata.assistantMessageCount = this.exportData.messages
             .filter(msg => msg.author === 'assistant').length;
         
+        const firstMessageContent = this.exportData.messages[0]?.content;
+        const lastMessageContent = this.exportData.messages[this.exportData.messages.length - 1]?.content;
+
         this.exportData.metadata.conversationSummary = {
-            firstMessage: this.exportData.messages[0]?.content.substring(0, 100) + '...',
-            lastMessage: this.exportData.messages[this.exportData.messages.length - 1]?.content.substring(0, 100) + '...',
+            firstMessage: this.truncate(firstMessageContent),
+            lastMessage: this.truncate(lastMessageContent),
             duration: this.calculateConversationDuration()
         };
     }

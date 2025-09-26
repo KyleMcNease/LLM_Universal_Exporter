@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 function validateManifest() {
-    const manifestPath = path.join(__dirname, '../manifest.json');
+    const manifestPath = path.join(__dirname, '../extension/manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
 
     // Basic schema check (Manifest V3 required fields)

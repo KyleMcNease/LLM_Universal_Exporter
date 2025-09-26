@@ -5,17 +5,40 @@ const { ESLint } = require('eslint');
 const fs = require('fs');
 const path = require('path');
 
+function isSecurityPluginAvailable() {
+    try {
+        require.resolve('eslint-plugin-security');
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+function walkFiles(dir) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    return entries.flatMap((entry) => {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            return walkFiles(fullPath);
+        }
+        return entry.isFile() ? [fullPath] : [];
+    });
+}
+
 async function runSecurityCheck() {
+    const securityPluginAvailable = isSecurityPluginAvailable();
     const eslint = new ESLint({
         useEslintrc: false,
         overrideConfig: {
-            plugins: ['security'], // Assume eslint-plugin-security installed as dev dep
-            rules: {
+            env: { browser: true, es2021: true },
+            parserOptions: { ecmaVersion: 2021, sourceType: 'module' },
+            plugins: securityPluginAvailable ? ['security'] : [],
+            extends: securityPluginAvailable ? ['plugin:security/recommended'] : [],
+            rules: securityPluginAvailable ? {
                 'security/detect-object-injection': 'error',
                 'security/detect-non-literal-regexp': 'error',
-                'security/detect-unsafe-regex': 'error',
-                // Add more security rules
-            }
+                'security/detect-unsafe-regex': 'error'
+            } : {}
         }
     });
 
@@ -27,14 +50,13 @@ async function runSecurityCheck() {
     console.log(resultText);
 
     // Simple custom check for hard-coded secrets (e.g., API keys)
-    const files = fs.readdirSync(path.join(__dirname, '../extension'), { recursive: true });
-    files.forEach(file => {
-        if (file.endsWith('.js')) {
-            const content = fs.readFileSync(file, 'utf-8');
-            const secretRegex = /(api_key|token|password)\s*=\s*['"][a-zA-Z0-9+/=]{20,}['"]/gi;
-            if (secretRegex.test(content)) {
-                console.warn(`Potential secret found in ${file}`);
-            }
+    const extensionRoot = path.join(__dirname, '../extension');
+    const files = walkFiles(extensionRoot).filter(filePath => filePath.endsWith('.js'));
+    files.forEach(filePath => {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const secretRegex = /(api_key|token|password)\s*=\s*['"][a-zA-Z0-9+/=]{20,}['"]/gi;
+        if (secretRegex.test(content)) {
+            console.warn(`Potential secret found in ${path.relative(extensionRoot, filePath)}`);
         }
     });
 
