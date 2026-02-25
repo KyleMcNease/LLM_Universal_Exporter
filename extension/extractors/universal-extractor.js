@@ -21,7 +21,11 @@ class UniversalExtractor {
                 userAgent: navigator.userAgent,
                 messageCount: 0,
                 thinkingBlockCount: 0,
-                hasThinkingBlocks: false
+                hasThinkingBlocks: false,
+                referenceCount: 0,
+                linkCount: 0,
+                attachmentCount: 0,
+                citationCount: 0
             },
             messages: [],
             thinkingBlocks: [],
@@ -141,6 +145,7 @@ class UniversalExtractor {
         if (elements.messages.length === 0) {
             elements.messages = this.safeQuerySelectorAll(this.selectors.messages);
         }
+        elements.messages = this.normalizeMessageElements(elements.messages);
 
         if (this.selectors.thinkingBlocks) {
             const thinkingSelectors = this.selectors.thinkingBlocks
@@ -172,6 +177,57 @@ class UniversalExtractor {
         return elements;
     }
 
+    normalizeMessageElements(messageElements) {
+        if (!Array.isArray(messageElements) || messageElements.length === 0) {
+            return [];
+        }
+
+        const unique = [...new Set(messageElements)].filter((el) => el && el.nodeType === Node.ELEMENT_NODE);
+        if (unique.length <= 1) {
+            return unique;
+        }
+
+        const normalized = unique.filter((el) => {
+            const text = (el.innerText || el.textContent || '').trim();
+            if (!text) return false;
+
+            const tag = (el.tagName || '').toLowerCase();
+            if (tag === 'script' || tag === 'style' || tag === 'noscript') {
+                return false;
+            }
+
+            const dataTestId = el.getAttribute('data-testid') || '';
+            if (dataTestId.startsWith('conversation-turn-')) {
+                return true;
+            }
+
+            const hasRoleOnElement = Boolean(
+                el.getAttribute('data-message-author-role') ||
+                el.getAttribute('data-author') ||
+                el.getAttribute('data-role')
+            );
+            if (hasRoleOnElement) {
+                return true;
+            }
+
+            const hasRoleDescendant = Boolean(
+                this.safeQuerySelector('[data-message-author-role], [data-author], [data-role]', el)
+            );
+            if (hasRoleDescendant) {
+                return false;
+            }
+
+            const containsAnotherMessage = unique.some((other) => other !== el && el.contains(other));
+            if (containsAnotherMessage && text.length > 2000) {
+                return false;
+            }
+
+            return true;
+        });
+
+        return normalized.length > 0 ? normalized : unique;
+    }
+
     async expandElements(elements) {
         if (!Array.isArray(elements.thinkingBlocks) || elements.thinkingBlocks.length === 0) {
             return;
@@ -192,10 +248,24 @@ class UniversalExtractor {
     
     async expandElement(element) {
         const methods = [
+            () => {
+                if (element.tagName === 'DETAILS') {
+                    element.setAttribute('open', '');
+                }
+            },
             () => element.click(),
             () => {
                 const button = element.querySelector('button');
                 if (button) button.click();
+            },
+            () => {
+                const toggle = element.querySelector('[aria-expanded="false"], details:not([open]), button[aria-expanded="false"]');
+                if (!toggle) return;
+                if (toggle.tagName === 'DETAILS') {
+                    toggle.setAttribute('open', '');
+                } else {
+                    toggle.click();
+                }
             },
             () => {
                 if (element.getAttribute('aria-expanded') === 'false') {
@@ -213,8 +283,9 @@ class UniversalExtractor {
                 method();
                 await this.wait(50);
                 
-                if (element.getAttribute('aria-expanded') === 'true' || 
-                    element.classList.contains('expanded')) {
+                if (element.getAttribute('aria-expanded') === 'true' ||
+                    element.classList.contains('expanded') ||
+                    element.hasAttribute('open')) {
                     return;
                 }
             } catch (error) {
@@ -252,6 +323,31 @@ class UniversalExtractor {
                 this.exportData.thinkingBlocks.push(thinking);
             }
         });
+
+        this.exportData.messages = this.dedupeMessages(this.exportData.messages);
+    }
+
+    dedupeMessages(messages) {
+        if (!Array.isArray(messages) || messages.length <= 1) {
+            return Array.isArray(messages) ? messages : [];
+        }
+
+        const deduped = [];
+        let previousSignature = null;
+
+        messages.forEach((message) => {
+            const signature = [
+                message.author || 'assistant',
+                (message.content || '').trim().replace(/\s+/g, ' ').slice(0, 500)
+            ].join('|');
+
+            if (signature !== previousSignature) {
+                deduped.push(message);
+                previousSignature = signature;
+            }
+        });
+
+        return deduped;
     }
     
     extractMessage(msgEl, index) {
@@ -261,7 +357,7 @@ class UniversalExtractor {
         if (!content.trim()) {
             return null;
         }
-        
+
         const message = {
             id: `msg_${index}`,
             author: author,
@@ -271,12 +367,17 @@ class UniversalExtractor {
             wordCount: content.split(/\s+/).length,
             characterCount: content.length
         };
-        
+
         const embeddedThinking = this.extractEmbeddedThinking(msgEl);
         if (embeddedThinking.length > 0) {
             message.thinkingBlocks = embeddedThinking;
         }
-        
+
+        const references = this.extractReferences(msgEl);
+        if (this.hasReferences(references)) {
+            message.references = references;
+        }
+
         return message;
     }
     
@@ -337,39 +438,69 @@ class UniversalExtractor {
     }
 
     determineAuthor(msgEl) {
+        // First, check if the element itself matches user/assistant selectors
         if (this.isValidSelector(this.selectors.userMessages) && msgEl.matches(this.selectors.userMessages)) {
             return 'user';
         }
-        
+
         if (this.isValidSelector(this.selectors.assistantMessages) && msgEl.matches(this.selectors.assistantMessages)) {
             return 'assistant';
         }
-        
-        const authorAttr = msgEl.getAttribute('data-author') || 
+
+        // For turn wrappers, look INSIDE for user/assistant elements
+        if (this.isValidSelector(this.selectors.userMessages)) {
+            const userEl = this.safeQuerySelector(this.selectors.userMessages, msgEl);
+            if (userEl) {
+                return 'user';
+            }
+        }
+
+        if (this.isValidSelector(this.selectors.assistantMessages)) {
+            const assistantEl = this.safeQuerySelector(this.selectors.assistantMessages, msgEl);
+            if (assistantEl) {
+                return 'assistant';
+            }
+        }
+
+        // Check data attributes on the element
+        const authorAttr = msgEl.getAttribute('data-author') ||
                           msgEl.getAttribute('data-message-author-role') ||
                           msgEl.getAttribute('data-role');
-        
+
         if (authorAttr) {
             return authorAttr.toLowerCase().includes('user') ? 'user' : 'assistant';
         }
-        
+
+        // Text-based heuristics as last resort
         const text = (msgEl.textContent || '').toLowerCase();
         if (text.includes('you:') || text.includes('user:')) {
             return 'user';
         }
-        
+
         // Heuristic backups for open-source
         const userRegex = /^(You:|User:|Human:)/i;
         if (userRegex.test(text)) return 'user';
-        
+
         const assistantRegex = /^(AI:|Assistant:|Bot:)/i;
         if (assistantRegex.test(text)) return 'assistant';
-        
+
         return 'assistant';
     }
     
     getTextContent(element) {
         if (!element) return '';
+        return element.innerText || element.textContent || '';
+    }
+
+    /**
+     * Get response body content, attempting to exclude thinking block content
+     * to prevent duplication. Falls back to full content if filtering fails.
+     */
+    getResponseContent(element) {
+        if (!element) return '';
+
+        // For now, just return full content - we'll handle deduplication
+        // at the template level by checking if content matches thinking blocks
         return element.innerText || element.textContent || '';
     }
 
@@ -393,8 +524,240 @@ class UniversalExtractor {
         
         return null;
     }
+
+    hasReferences(refs) {
+        if (!refs || typeof refs !== 'object') return false;
+        return ['links', 'attachments', 'documents', 'citations'].some((key) =>
+            Array.isArray(refs[key]) && refs[key].length > 0
+        );
+    }
+
+    getFileExtension(value) {
+        if (!value || typeof value !== 'string') return '';
+        const clean = value.split('?')[0].split('#')[0];
+        const match = clean.match(/\.([a-z0-9]+)$/i);
+        return match ? match[1].toLowerCase() : '';
+    }
+
+    classifyDocumentType(nameOrUrl) {
+        const ext = this.getFileExtension(nameOrUrl);
+        if (!ext) return null;
+
+        const docExt = new Set([
+            'pdf', 'doc', 'docx', 'txt', 'md', 'rtf', 'odt',
+            'csv', 'tsv', 'xls', 'xlsx', 'ppt', 'pptx',
+            'json', 'xml', 'yaml', 'yml'
+        ]);
+        return docExt.has(ext) ? ext : null;
+    }
+
+    normalizeAbsoluteUrl(rawUrl) {
+        if (!rawUrl || typeof rawUrl !== 'string') return null;
+        try {
+            const url = new URL(rawUrl, window.location.href);
+            return url.href;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    dedupeObjectsBySignature(items, buildSignature) {
+        const seen = new Set();
+        const deduped = [];
+
+        (items || []).forEach((item) => {
+            const signature = buildSignature(item);
+            if (!signature || seen.has(signature)) return;
+            seen.add(signature);
+            deduped.push(item);
+        });
+
+        return deduped;
+    }
+
+    extractReferences(element) {
+        const references = {
+            links: [],
+            attachments: [],
+            documents: [],
+            citations: []
+        };
+        if (!element) return references;
+
+        const anchors = this.safeQuerySelectorAll('a[href]', element);
+        anchors.forEach((anchor) => {
+            const href = this.normalizeAbsoluteUrl(anchor.getAttribute('href'));
+            if (!href) return;
+
+            const title = (anchor.innerText || anchor.textContent || '').trim();
+            let domain = '';
+            try {
+                domain = new URL(href).hostname;
+            } catch (error) {
+                domain = '';
+            }
+
+            references.links.push({ url: href, title, domain });
+
+            const docType = this.classifyDocumentType(href) || this.classifyDocumentType(title);
+            if (docType) {
+                references.documents.push({
+                    name: title || href.split('/').pop() || href,
+                    url: href,
+                    type: docType
+                });
+            }
+        });
+
+        const attachmentSelectors = [
+            '[data-file-name]',
+            '[data-filename]',
+            '[data-testid*="attachment"]',
+            '[data-testid*="file"]',
+            '.attachment',
+            '.file-chip',
+            '.uploaded-file'
+        ].join(', ');
+
+        const attachmentNodes = this.safeQuerySelectorAll(attachmentSelectors, element);
+        attachmentNodes.forEach((node) => {
+            const name = (
+                node.getAttribute('data-file-name') ||
+                node.getAttribute('data-filename') ||
+                node.getAttribute('aria-label') ||
+                node.innerText ||
+                node.textContent ||
+                ''
+            ).trim();
+
+            const linked = node.tagName === 'A'
+                ? this.normalizeAbsoluteUrl(node.getAttribute('href'))
+                : this.normalizeAbsoluteUrl(node.querySelector('a[href]')?.getAttribute('href'));
+
+            if (!name && !linked) return;
+
+            const type = this.classifyDocumentType(name || linked || '');
+            references.attachments.push({
+                name: name || (linked ? linked.split('/').pop() : 'attachment'),
+                url: linked || null,
+                type: type || 'file'
+            });
+
+            if (type) {
+                references.documents.push({
+                    name: name || (linked ? linked.split('/').pop() : 'document'),
+                    url: linked || null,
+                    type
+                });
+            }
+        });
+
+        const citationNodes = this.safeQuerySelectorAll(
+            '[data-testid*="citation"], [data-testid*="source"], .citation, .reference-link',
+            element
+        );
+        citationNodes.forEach((node) => {
+            const text = (node.innerText || node.textContent || '').trim();
+            const href = this.normalizeAbsoluteUrl(node.getAttribute('href') || node.querySelector('a[href]')?.getAttribute('href'));
+            if (!text && !href) return;
+            references.citations.push({ text, url: href || null });
+        });
+
+        const rawText = this.getTextContent(element);
+        const urlRegex = /\bhttps?:\/\/[^\s<>"')]+/gi;
+        const textUrls = rawText.match(urlRegex) || [];
+        textUrls.forEach((urlText) => {
+            const normalized = this.normalizeAbsoluteUrl(urlText);
+            if (!normalized) return;
+            let domain = '';
+            try {
+                domain = new URL(normalized).hostname;
+            } catch (error) {
+                domain = '';
+            }
+            references.links.push({
+                url: normalized,
+                title: '',
+                domain
+            });
+
+            const docType = this.classifyDocumentType(normalized);
+            if (docType) {
+                references.documents.push({
+                    name: normalized.split('/').pop() || normalized,
+                    url: normalized,
+                    type: docType
+                });
+            }
+        });
+
+        references.links = this.dedupeObjectsBySignature(
+            references.links,
+            (item) => `${item.url}|${item.title || ''}`
+        );
+        references.attachments = this.dedupeObjectsBySignature(
+            references.attachments,
+            (item) => `${item.name || ''}|${item.url || ''}|${item.type || ''}`
+        );
+        references.documents = this.dedupeObjectsBySignature(
+            references.documents,
+            (item) => `${item.name || ''}|${item.url || ''}|${item.type || ''}`
+        );
+        references.citations = this.dedupeObjectsBySignature(
+            references.citations,
+            (item) => `${item.text || ''}|${item.url || ''}`
+        );
+
+        return references;
+    }
+
+    mergeReferences(...referenceSets) {
+        const merged = {
+            links: [],
+            attachments: [],
+            documents: [],
+            citations: []
+        };
+
+        referenceSets.forEach((set) => {
+            if (!set || typeof set !== 'object') return;
+            merged.links.push(...(set.links || []));
+            merged.attachments.push(...(set.attachments || []));
+            merged.documents.push(...(set.documents || []));
+            merged.citations.push(...(set.citations || []));
+        });
+
+        merged.links = this.dedupeObjectsBySignature(merged.links, (item) => `${item.url}|${item.title || ''}`);
+        merged.attachments = this.dedupeObjectsBySignature(merged.attachments, (item) => `${item.name || ''}|${item.url || ''}|${item.type || ''}`);
+        merged.documents = this.dedupeObjectsBySignature(merged.documents, (item) => `${item.name || ''}|${item.url || ''}|${item.type || ''}`);
+        merged.citations = this.dedupeObjectsBySignature(merged.citations, (item) => `${item.text || ''}|${item.url || ''}`);
+
+        return merged;
+    }
+
+    buildReferenceIndex() {
+        const fromMessages = this.exportData.messages
+            .map((message) => message.references)
+            .filter(Boolean);
+        const referenceIndex = this.mergeReferences(...fromMessages);
+        const totals = (
+            referenceIndex.links.length +
+            referenceIndex.attachments.length +
+            referenceIndex.documents.length +
+            referenceIndex.citations.length
+        );
+
+        return {
+            ...referenceIndex,
+            total: totals
+        };
+    }
     
     async postProcess() {
+        this.exportData.metadata.messageCount = this.exportData.messages.length;
+        this.exportData.metadata.thinkingBlockCount = this.exportData.thinkingBlocks.length;
+        this.exportData.metadata.hasThinkingBlocks = this.exportData.thinkingBlocks.length > 0;
+
         this.exportData.metadata.totalWordCount = this.exportData.messages
             .reduce((sum, msg) => sum + (msg.wordCount || 0), 0);
         
@@ -406,6 +769,13 @@ class UniversalExtractor {
         
         this.exportData.metadata.assistantMessageCount = this.exportData.messages
             .filter(msg => msg.author === 'assistant').length;
+
+        const referenceIndex = this.buildReferenceIndex();
+        this.exportData.metadata.referenceIndex = referenceIndex;
+        this.exportData.metadata.referenceCount = referenceIndex.total;
+        this.exportData.metadata.linkCount = referenceIndex.links.length;
+        this.exportData.metadata.attachmentCount = referenceIndex.attachments.length;
+        this.exportData.metadata.citationCount = referenceIndex.citations.length;
         
         const firstMessageContent = this.exportData.messages[0]?.content;
         const lastMessageContent = this.exportData.messages[this.exportData.messages.length - 1]?.content;

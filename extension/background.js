@@ -10,6 +10,7 @@ const CONFIG = {
     supportedDomains: [
         'claude.ai',
         'chat.openai.com',
+        'chatgpt.com',
         'gemini.google.com',
         'bard.google.com',
         'perplexity.ai',
@@ -431,6 +432,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ success: true });
             break;
             
+        case 'turn_captured':
+            handleTurnCapture(request.turn)
+                .then(() => sendResponse({ success: true }))
+                .catch(error => sendResponse({ success: false, error: error.message }));
+            return true;
+
+        case 'compaction_detected':
+            handleCompactionEvent(request)
+                .then(() => sendResponse({ success: true }))
+                .catch(error => sendResponse({ success: false, error: error.message }));
+            return true;
+
+        case 'get_captured_turns':
+            getCapturedTurns(request.sessionId)
+                .then(turns => sendResponse({ turns }))
+                .catch(error => sendResponse({ turns: [], error: error.message }));
+            return true;
+
         case 'get_analytics':
             getAnalyticsData()
                 .then(data => sendResponse(data))
@@ -671,5 +690,130 @@ chrome.management.onDisabled.addListener((info) => {
         trackEvent('extension_disabled');
     }
 });
+
+// ══════════════════════════════════════════════
+// TURN WATCHER — Continuous capture storage
+// ══════════════════════════════════════════════
+
+/**
+ * Store a captured turn in chrome.storage.local.
+ * Turns are keyed by sessionId for retrieval.
+ * Also forwards to Python stream receiver as belt-and-suspenders.
+ */
+async function handleTurnCapture(turn) {
+    if (!turn || !turn.sessionId) {
+        console.warn('⚠️ Invalid turn data received');
+        return;
+    }
+
+    const storageKey = `tw_session_${turn.sessionId}`;
+
+    try {
+        // Append to session array in storage
+        const result = await chrome.storage.local.get(storageKey);
+        const session = result[storageKey] || {
+            sessionId: turn.sessionId,
+            conversationUrl: turn.conversationUrl,
+            platform: turn.platform,
+            startedAt: new Date().toISOString(),
+            turns: []
+        };
+
+        session.turns.push(turn);
+        session.lastUpdated = new Date().toISOString();
+        session.turnCount = session.turns.length;
+
+        await chrome.storage.local.set({ [storageKey]: session });
+
+        // Update session index
+        const indexResult = await chrome.storage.local.get('tw_session_index');
+        const index = indexResult.tw_session_index || [];
+        if (!index.includes(turn.sessionId)) {
+            index.push(turn.sessionId);
+            // Keep last 100 sessions
+            if (index.length > 100) index.shift();
+            await chrome.storage.local.set({ tw_session_index: index });
+        }
+
+        // Forward to Python receiver (best-effort, fire-and-forget)
+        forwardToReceiver('/turn', turn);
+
+        console.log(`📝 Turn stored: ${turn.role} | session ${turn.sessionId.slice(0, 12)}... | total: ${session.turnCount}`);
+
+    } catch (error) {
+        console.error('💥 Turn storage failed:', error);
+        throw error;
+    }
+}
+
+/**
+ * Handle compaction detection event.
+ */
+async function handleCompactionEvent(event) {
+    const compactionRecord = {
+        type: 'compaction_detected',
+        sessionId: event.sessionId,
+        conversationUrl: event.conversationUrl,
+        timestamp: event.timestamp || new Date().toISOString(),
+        capturedTurns: event.capturedTurns || 0
+    };
+
+    // Store compaction events
+    const result = await chrome.storage.local.get('tw_compaction_log');
+    const log = result.tw_compaction_log || [];
+    log.push(compactionRecord);
+    if (log.length > 50) log.shift();
+    await chrome.storage.local.set({ tw_compaction_log: log });
+
+    // Forward to receiver
+    forwardToReceiver('/event', compactionRecord);
+
+    console.log('🚨 Compaction event logged:', compactionRecord);
+}
+
+/**
+ * Retrieve captured turns for a session.
+ */
+async function getCapturedTurns(sessionId) {
+    if (!sessionId) {
+        // Return all session summaries
+        const indexResult = await chrome.storage.local.get('tw_session_index');
+        const index = indexResult.tw_session_index || [];
+        const summaries = [];
+
+        for (const sid of index.slice(-20)) {
+            const result = await chrome.storage.local.get(`tw_session_${sid}`);
+            const session = result[`tw_session_${sid}`];
+            if (session) {
+                summaries.push({
+                    sessionId: sid,
+                    conversationUrl: session.conversationUrl,
+                    turnCount: session.turnCount,
+                    startedAt: session.startedAt,
+                    lastUpdated: session.lastUpdated
+                });
+            }
+        }
+
+        return summaries;
+    }
+
+    const result = await chrome.storage.local.get(`tw_session_${sessionId}`);
+    return result[`tw_session_${sessionId}`]?.turns || [];
+}
+
+/**
+ * Forward data to the Python stream receiver (fire-and-forget).
+ */
+function forwardToReceiver(endpoint, data) {
+    const url = `http://localhost:7749${endpoint}`;
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }).catch(() => {
+        // Receiver not running — fine, storage has the data
+    });
+}
 
 console.log(`🚀 ${CONFIG.name} v${CONFIG.version} background script loaded`);

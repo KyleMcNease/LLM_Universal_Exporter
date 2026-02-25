@@ -11,16 +11,25 @@
     "copy-icons": "echo 'icons bundled with extension copy'",
     "generate-icons": "node scripts/generate-icons.js",
     "copy-libs": "echo 'libs bundled with extension copy'",
-    "download-libs": "npm run download-jspdf && npm run download-html2canvas && npm run download-marked",
+    "download-libs": "npm run download-jspdf && npm run download-html2canvas && npm run download-marked && npm run download-docx",
     "download-jspdf": "curl -o extension/libs/jspdf.umd.min.js https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
     "download-html2canvas": "curl -o extension/libs/html2canvas.min.js https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
     "download-marked": "curl -o extension/libs/marked.min.js https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js",
+    "download-docx": "curl -o extension/libs/docx.umd.js https://unpkg.com/docx@8.5.0/build/index.umd.js",
     "package": "npm run build && cd dist && zip -r ../universal-ai-exporter-v1.0.0.zip .",
     "dev": "npm run build && npm run watch",
     "watch": "chokidar \"extension/**/*\" -c \"npm run copy-extension\"",
-    "test": "npm run test-lint && npm run test-security",
-    "test-lint": "eslint extension/ --ext .js",
+    "lint": "npm run test-lint",
+    "test": "npm run test-lint && npm run test-security && npm run test-extractors && npm run test-fixtures",
+    "test-lint": "eslint extension/background.js extension/content-script.js extension/core extension/extractors extension/popup extension/ui --ext .js",
     "test-security": "node scripts/security-check.js",
+    "test-extractors": "node scripts/test-extractors.js",
+    "test-fixtures": "node scripts/test-fixture-snapshots.js",
+    "test-chatgpt-sim": "node scripts/simulate-chatgpt-webapp.js",
+    "test-chatgpt-live": "node scripts/playwright-chatgpt-live-verify.js",
+    "test-widget-gates": "node scripts/test-widget-gates.js",
+    "test-paid-gates": "node scripts/test-paid-grade-gates.js",
+    "test-release-gates": "npm run test && npm run test-widget-gates && npm run test-paid-gates",
     "release": "npm run test && npm run package && npm run generate-release-notes",
     "generate-release-notes": "node scripts/generate-release-notes.js",
     "install-deps": "npm install",
@@ -57,12 +66,13 @@
   },
   "homepage": "https://universalaiexporter.com",
   "devDependencies": {
-    "eslint": "^8.50.0",
-    "chokidar-cli": "^3.0.0",
     "canvas": "^2.11.2",
+    "chokidar-cli": "^3.0.0",
+    "eslint": "^8.50.0",
+    "jsdom": "^22.1.0",
+    "playwright": "^1.58.2",
     "sharp": "^0.32.6"
   },
-  "dependencies": {},
   "engines": {
     "node": ">=16.0.0",
     "npm": ">=8.0.0"
@@ -111,14 +121,21 @@
     "model": "freemium",
     "free_tier": {
       "exports_per_day": 10,
-      "formats": ["markdown", "json", "csv", "txt"],
+      "formats": [
+        "markdown",
+        "json",
+        "csv",
+        "txt"
+      ],
       "thinking_blocks": true
     },
     "pro_tier": {
       "price_monthly": 4.99,
       "price_annual": 49.99,
       "exports_per_day": "unlimited",
-      "formats": ["all"],
+      "formats": [
+        "all"
+      ],
       "premium_pdf": true,
       "research_archive": true,
       "priority_support": true
@@ -127,7 +144,7 @@
   "features": {
     "supported_platforms": [
       "claude.ai",
-      "chat.openai.com", 
+      "chat.openai.com",
       "gemini.google.com",
       "bard.google.com",
       "perplexity.ai",
@@ -143,7 +160,7 @@
     ],
     "export_formats": [
       "pdf",
-      "markdown", 
+      "markdown",
       "json",
       "csv",
       "html",

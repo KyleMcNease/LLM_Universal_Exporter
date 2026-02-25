@@ -30,6 +30,7 @@ async function runSecurityCheck() {
     const eslint = new ESLint({
         useEslintrc: false,
         overrideConfig: {
+            ignorePatterns: ['extension/libs/**'],
             env: { browser: true, es2021: true },
             parserOptions: { ecmaVersion: 2021, sourceType: 'module' },
             plugins: securityPluginAvailable ? ['security'] : [],
@@ -51,7 +52,10 @@ async function runSecurityCheck() {
 
     // Simple custom check for hard-coded secrets (e.g., API keys)
     const extensionRoot = path.join(__dirname, '../extension');
-    const files = walkFiles(extensionRoot).filter(filePath => filePath.endsWith('.js'));
+    const files = walkFiles(extensionRoot).filter((filePath) => {
+        if (!filePath.endsWith('.js')) return false;
+        return !filePath.includes(`${path.sep}libs${path.sep}`);
+    });
     files.forEach(filePath => {
         const content = fs.readFileSync(filePath, 'utf-8');
         const secretRegex = /(api_key|token|password)\s*=\s*['"][a-zA-Z0-9+/=]{20,}['"]/gi;

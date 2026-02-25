@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Claude Fixture</title>
+</head>
+<body>
+  <main class="flex-1 flex flex-col px-4 max-w-3xl">
+    <div class="mb-1 mt-6 group">
+      <div data-testid="user-message">
+        Build a production-ready export plan for this codebase.
+        Here is our source doc:
+        <a href="https://example.com/specs/memory-system.pdf">memory-system.pdf</a>
+        and uploaded notes
+        <span data-testid="attachment-chip" data-file-name="team-notes.md">team-notes.md</span>.
+      </div>
+    </div>
+
+    <div class="mb-1 mt-6 group">
+      <div class="font-claude-response">
+        <div>
+          <div class="grid grid-rows-[auto_auto]">
+            <div class="row-start-1">
+              <button class="group/status-thinking">Extended thinking</button>
+              <div class="grid transition-[grid-template-rows]">
+                <div class="overflow-hidden">
+                  <div class="font-ui">
+                    I should audit architecture, then patch extractor resilience, then add regression tests.
+                  </div>
+                </div>
+              </div>
+
+              <button class="group/status-tool">Ran npm test</button>
+              <div class="grid transition-[grid-template-rows]">
+                <div class="overflow-hidden">
+                  <pre><code class="language-bash">npm run test</code></pre>
+                  <div>Output</div>
+                  <div>All checks passed</div>
+                </div>
+              </div>
+
+              <button class="group/status-prompt">Prompt chain</button>
+              <div class="grid transition-[grid-template-rows]">
+                <div class="overflow-hidden">
+                  <div>1) Gather references</div>
+                  <div>2) Expand tool traces</div>
+                  <div>3) Persist conversation graph</div>
+                </div>
+              </div>
+            </div>
+            <div class="row-start-2">
+              <div class="standard-markdown">
+                Here is the hardened implementation and validation strategy.
+                <a class="citation" href="https://docs.anthropic.com/en/docs/claude-code">Anthropic docs</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

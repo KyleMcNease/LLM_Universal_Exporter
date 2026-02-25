@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>ChatGPT Fixture</title>
+</head>
+<body>
+  <main role="main">
+    <article data-testid="conversation-turn-1" data-message-author-role="user">
+      <div class="prose">
+        Can you harden this exporter for production reliability?
+        We uploaded <a href="https://arxiv.org/pdf/2401.12345.pdf">architecture-paper.pdf</a>
+        and a local file
+        <span data-testid="attachment-chip" data-file-name="runbook.docx">runbook.docx</span>.
+      </div>
+    </article>
+
+    <article data-testid="conversation-turn-2" data-message-author-role="assistant">
+      <details data-testid="reasoning-panel">
+        <summary>Reasoning</summary>
+        <div>I will patch selector resilience, add fixture snapshots, and enforce validation checks.</div>
+      </details>
+      <details data-testid="tool-call-panel">
+        <summary>Tool call: test runner</summary>
+        <div>Ran <code>npm run test-release-gates</code> and captured Output: all checks passed.</div>
+      </details>
+      <details data-testid="prompt-chain-panel">
+        <summary>Prompt chain</summary>
+        <div>1. Parse artifacts. 2. Map linked docs. 3. Index for memory graph.</div>
+      </details>
+
+      <div class="prose">
+        Yes. I added stronger extraction paths, CI checks, and fixture tests.
+        Source citation:
+        <a data-testid="citation-link" href="https://platform.openai.com/docs">OpenAI docs</a>
+      </div>
+    </article>
+  </main>
+</body>
+</html>

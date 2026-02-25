@@ -67,6 +67,154 @@
     let exportInterface = null;
     let platformDetector = null;
     let isInitialized = false;
+    let suppressFabClickUntil = 0;
+
+    const WIDGET_POSITION_STORAGE_KEY = 'uae_widget_positions_v1';
+    const WIDGET_STYLE_ELEMENT_ID = 'uae-floating-button-style';
+
+    function getStorageArea() {
+        return extApi?.storage?.local || extApi?.storage?.sync || null;
+    }
+
+    function getDefaultWidgetPosition() {
+        const isMobile = window.innerWidth <= 768;
+        const size = isMobile ? 48 : 56;
+        const marginX = isMobile ? 16 : 20;
+        const marginY = isMobile ? 80 : 20;
+
+        return {
+            x: Math.max(marginX, window.innerWidth - size - marginX),
+            y: Math.max(marginX, window.innerHeight - size - marginY)
+        };
+    }
+
+    function clampWidgetPosition(button, position) {
+        const rect = button.getBoundingClientRect();
+        const width = rect.width || 56;
+        const height = rect.height || 56;
+        const margin = 8;
+
+        const minX = margin;
+        const minY = margin;
+        const maxX = Math.max(minX, window.innerWidth - width - margin);
+        const maxY = Math.max(minY, window.innerHeight - height - margin);
+
+        const x = Math.min(maxX, Math.max(minX, Number(position?.x) || minX));
+        const y = Math.min(maxY, Math.max(minY, Number(position?.y) || minY));
+
+        return { x, y };
+    }
+
+    function applyWidgetPosition(button, position) {
+        const next = clampWidgetPosition(button, position);
+        button.style.left = `${next.x}px`;
+        button.style.top = `${next.y}px`;
+        button.style.right = 'auto';
+        button.style.bottom = 'auto';
+        return next;
+    }
+
+    function loadWidgetPosition(hostname, callback) {
+        const storageArea = getStorageArea();
+        if (!storageArea?.get) {
+            callback(null);
+            return;
+        }
+
+        storageArea.get(WIDGET_POSITION_STORAGE_KEY, (result = {}) => {
+            const allPositions = result[WIDGET_POSITION_STORAGE_KEY] || {};
+            callback(allPositions[hostname] || null);
+        });
+    }
+
+    function saveWidgetPosition(hostname, position) {
+        const storageArea = getStorageArea();
+        if (!storageArea?.get || !storageArea?.set) return;
+
+        storageArea.get(WIDGET_POSITION_STORAGE_KEY, (result = {}) => {
+            const allPositions = result[WIDGET_POSITION_STORAGE_KEY] || {};
+            allPositions[hostname] = {
+                x: Math.round(position.x),
+                y: Math.round(position.y),
+                updatedAt: Date.now()
+            };
+
+            storageArea.set({ [WIDGET_POSITION_STORAGE_KEY]: allPositions });
+        });
+    }
+
+    function installFloatingButtonStyles() {
+        const existing = document.getElementById(WIDGET_STYLE_ELEMENT_ID);
+        if (existing) return;
+
+        const style = document.createElement('style');
+        style.id = WIDGET_STYLE_ELEMENT_ID;
+        style.textContent = `
+            #uae-floating-button {
+                touch-action: none;
+                cursor: grab;
+                z-index: 2147483647 !important;
+            }
+
+            #uae-floating-button.uae-dragging {
+                cursor: grabbing;
+                transform: scale(1.05);
+            }
+
+            #uae-floating-button:hover {
+                transform: translateY(-2px) scale(1.06);
+                box-shadow: 0 10px 28px rgba(20, 16, 10, 0.46);
+            }
+
+            #uae-floating-button.uae-dragging:hover {
+                transform: scale(1.05);
+            }
+            
+            .uae-fab-tooltip {
+                position: absolute;
+                bottom: 70px;
+                right: 0;
+                background: rgba(17, 24, 33, 0.95);
+                color: #f4f0e8;
+                border: 1px solid rgba(216, 182, 122, 0.35);
+                padding: 8px 12px;
+                border-radius: 6px;
+                font-size: 12px;
+                white-space: nowrap;
+                opacity: 0;
+                visibility: hidden;
+                transition: all 0.2s ease;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+            
+            #uae-floating-button:hover .uae-fab-tooltip {
+                opacity: 1;
+                visibility: visible;
+            }
+            
+            .uae-fab-icon {
+                transition: transform 0.2s ease;
+            }
+            
+            #uae-floating-button:hover .uae-fab-icon {
+                transform: scale(1.08);
+            }
+            
+            @media (max-width: 768px) {
+                #uae-floating-button {
+                    width: 48px;
+                    height: 48px;
+                    font-size: 18px;
+                }
+                
+                .uae-fab-tooltip {
+                    display: none;
+                }
+            }
+        `;
+
+        document.head.appendChild(style);
+    }
     
     /**
      * Main initialization function
@@ -191,6 +339,10 @@
         
         // Monitor URL changes
         const urlObserver = new MutationObserver(() => {
+            if (!window.location || typeof window.location.href !== 'string') {
+                return;
+            }
+
             if (window.location.href !== currentUrl) {
                 currentUrl = window.location.href;
                 console.log('🔄 Page changed, re-detecting platform...');
@@ -251,86 +403,113 @@
         
         button.style.cssText = `
             position: fixed;
-            bottom: 20px;
-            right: 20px;
             width: 56px;
             height: 56px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: radial-gradient(circle at 30% 20%, #e4c58f, #c89d5a 62%, #b18243 100%);
             border: none;
             border-radius: 50%;
-            color: white;
+            color: #17120b;
             font-size: 20px;
             cursor: pointer;
-            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 8px 22px rgba(20, 16, 10, 0.38);
             transition: all 0.3s ease;
             z-index: 999998;
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
+            position: fixed;
             overflow: visible;
         `;
-        
-        // Add hover styles
-        const style = document.createElement('style');
-        style.textContent = `
-            #uae-floating-button:hover {
-                transform: translateY(-2px) scale(1.1);
-                box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+
+        installFloatingButtonStyles();
+
+        const defaultPosition = getDefaultWidgetPosition();
+        applyWidgetPosition(button, defaultPosition);
+
+        loadWidgetPosition(window.location.hostname, (savedPosition) => {
+            if (savedPosition) {
+                applyWidgetPosition(button, savedPosition);
             }
-            
-            .uae-fab-tooltip {
-                position: absolute;
-                bottom: 70px;
-                right: 0;
-                background: rgba(0, 0, 0, 0.8);
-                color: white;
-                padding: 8px 12px;
-                border-radius: 6px;
-                font-size: 12px;
-                white-space: nowrap;
-                opacity: 0;
-                visibility: hidden;
-                transition: all 0.2s ease;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        });
+
+        let dragState = null;
+
+        button.addEventListener('pointerdown', (event) => {
+            if (event.button !== 0) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            const rect = button.getBoundingClientRect();
+            dragState = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                originX: rect.left,
+                originY: rect.top,
+                moved: false,
+                distance: 0
+            };
+
+            button.classList.add('uae-dragging');
+            button.setPointerCapture(event.pointerId);
+        });
+
+        button.addEventListener('pointermove', (event) => {
+            if (!dragState || event.pointerId !== dragState.pointerId) return;
+
+            const dx = event.clientX - dragState.startX;
+            const dy = event.clientY - dragState.startY;
+            dragState.distance = Math.hypot(dx, dy);
+
+            if (dragState.distance > 8) {
+                dragState.moved = true;
             }
-            
-            #uae-floating-button:hover .uae-fab-tooltip {
-                opacity: 1;
-                visibility: visible;
+
+            const nextPosition = {
+                x: dragState.originX + dx,
+                y: dragState.originY + dy
+            };
+            applyWidgetPosition(button, nextPosition);
+        });
+
+        button.addEventListener('pointerup', (event) => {
+            if (!dragState || event.pointerId !== dragState.pointerId) return;
+
+            const finalPosition = {
+                x: parseFloat(button.style.left),
+                y: parseFloat(button.style.top)
+            };
+
+            if (dragState.moved) {
+                suppressFabClickUntil = Date.now() + 350;
+                saveWidgetPosition(window.location.hostname, finalPosition);
             }
-            
-            .uae-fab-icon {
-                transition: transform 0.2s ease;
-            }
-            
-            #uae-floating-button:hover .uae-fab-icon {
-                transform: scale(1.1);
-            }
-            
-            @media (max-width: 768px) {
-                #uae-floating-button {
-                    bottom: 80px;
-                    right: 16px;
-                    width: 48px;
-                    height: 48px;
-                    font-size: 18px;
-                }
-                
-                .uae-fab-tooltip {
-                    display: none;
-                }
-            }
-        `;
-        
-        document.head.appendChild(style);
-        
+
+            button.classList.remove('uae-dragging');
+            dragState = null;
+        });
+
+        button.addEventListener('pointercancel', () => {
+            button.classList.remove('uae-dragging');
+            dragState = null;
+        });
+
         button.addEventListener('click', (e) => {
+            if (Date.now() < suppressFabClickUntil) return;
             e.preventDefault();
             e.stopPropagation();
             showExportInterface();
         });
-        
+
+        window.addEventListener('resize', () => {
+            const clamped = applyWidgetPosition(button, {
+                x: parseFloat(button.style.left),
+                y: parseFloat(button.style.top)
+            });
+            saveWidgetPosition(window.location.hostname, clamped);
+        });
+
         document.body.appendChild(button);
     }
     
@@ -347,7 +526,7 @@
             button.style.display = 'flex';
             const tooltip = button.querySelector('.uae-fab-tooltip');
             if (tooltip) {
-                tooltip.textContent = `Export ${platformDetector.getPlatformDisplayName()} Conversation (Alt+E)`;
+                tooltip.textContent = `Export ${platformDetector.getPlatformDisplayName()} Conversation (Alt+E) • Drag to move`;
             }
         } else {
             button.style.display = 'none';

@@ -1,31 +1,34 @@
 /**
  * ChatGPT-Specific Conversation Extractor
- * Specialized for chat.openai.com with enhanced code and math handling
+ * Specialized for ChatGPT with enhanced code and math handling
  */
 
 class ChatGPTExtractor extends UniversalExtractor {
     constructor(platformConfig) {
         super(platformConfig);
         
-        // Updated selectors for 2025 UI
+        // Updated selectors for modern ChatGPT UI
         this.chatgptSelectors = {
-            conversation: '[role="main"], .conversation-container, .chat-container',
-            messages: '[data-message-author-role], .group, .message-group',
+            conversation: '[role="main"], main, .conversation-container, .chat-container',
+            messages: 'article[data-testid^="conversation-turn-"], [data-message-author-role], .message-group, .group',
             
-            userMessages: '[data-message-author-role="user"], .group:has(.user-message)',
-            assistantMessages: '[data-message-author-role="assistant"], .group:has(.assistant-message)',
+            userMessages: '[data-message-author-role="user"], article[data-message-author-role="user"], [data-testid*="user-message"]',
+            assistantMessages: '[data-message-author-role="assistant"], article[data-message-author-role="assistant"], [data-testid*="assistant-message"]',
             
             codeBlocks: 'pre code, .code-block, .hljs',
             mathBlocks: '.math, .katex, mjx-container',
+            reasoningBlocks: 'details, [data-testid*="reasoning"], [data-testid*="thought"], [aria-label*="Reason"], [aria-label*="Thought"]',
+            traceBlocks: 'details, [data-testid*="reasoning"], [data-testid*="thought"], [data-testid*="tool"], [data-testid*="function"], [data-testid*="prompt-chain"], [data-testid*="chain"], [aria-label*="Reason"], [aria-label*="Thought"], [aria-label*="Tool"], [aria-label*="Prompt"]',
             messageContent: '.prose, .message-content, .whitespace-pre-wrap',
             
-            modelInfo: '.model-switcher, [data-model], .gpt-version',
+            modelInfo: '.model-switcher, [data-model], .gpt-version, [data-testid="model-switcher-dropdown-button"]',
             regenerateButton: '.regenerate-button, [aria-label*="regenerate"]',
             copyButtons: 'button[aria-label*="copy"], .copy-button',
             messageActions: '.message-actions, .action-buttons'
         };
         
         this.selectors = { ...this.selectors, ...this.chatgptSelectors };
+        this.selectors.thinkingBlocks = this.chatgptSelectors.traceBlocks;
         
         this.exportData.metadata.platform = 'chatgpt';
         this.exportData.metadata.gptModel = this.detectGPTModel();
@@ -62,7 +65,7 @@ class ChatGPTExtractor extends UniversalExtractor {
     }
     
     extractConversationId() {
-        const urlMatch = window.location.pathname.match(/\/c\/([a-f0-9-]+)/);
+        const urlMatch = window.location.pathname.match(/\/c\/([^/]+)/);
         if (urlMatch) return urlMatch[1];
         
         const conversationElement = document.querySelector('[data-conversation-id]');
@@ -72,16 +75,133 @@ class ChatGPTExtractor extends UniversalExtractor {
     extractMessage(msgEl, index) {
         const message = super.extractMessage(msgEl, index);
         if (!message) return null;
+
+        const traceBlocks = this.extractTraceBlocks(msgEl);
+        if (traceBlocks.length > 0) {
+            const existing = Array.isArray(message.thinkingBlocks) ? message.thinkingBlocks : [];
+            const merged = [...existing, ...traceBlocks];
+            message.thinkingBlocks = this.dedupeThinkingBlocks(merged);
+
+            message.thinkingBlocks.forEach((block) => {
+                this.exportData.thinkingBlocks.push(block);
+            });
+        }
         
         message.chatgpt = {
             messageId: this.extractMessageId(msgEl),
             isRegenerated: this.isRegeneratedMessage(msgEl),
             hasCodeBlocks: this.extractCodeBlocks(msgEl).length > 0,
             mathExpressions: this.extractMathExpressions(msgEl),
-            messageActions: this.extractMessageActions(msgEl)
+            messageActions: this.extractMessageActions(msgEl),
+            reasoningTraceCount: traceBlocks.filter((block) => block.type === 'thinking').length,
+            toolCallTraceCount: traceBlocks.filter((block) => block.type === 'tool_call').length,
+            promptChainTraceCount: traceBlocks.filter((block) => block.type === 'prompt_chain').length
         };
         
         return message;
+    }
+
+    classifyTraceType(summary, hint, content) {
+        const combined = `${summary} ${hint} ${content}`.toLowerCase();
+        if (/tool|function|call|run|command|output/.test(combined)) return 'tool_call';
+        if (/prompt|chain|system prompt|instruction/.test(combined)) return 'prompt_chain';
+        if (/reason|thinking|thought|analysis|deliberat/.test(combined)) return 'thinking';
+        return 'trace';
+    }
+
+    extractTraceBlocks(msgEl) {
+        const traces = [];
+        const elements = msgEl.querySelectorAll(this.selectors.traceBlocks || this.selectors.reasoningBlocks);
+
+        elements.forEach((el, index) => {
+            const summaryEl = el.querySelector('summary');
+            const summary = (summaryEl?.innerText || summaryEl?.textContent || '').trim();
+            const hint = [
+                summary,
+                el.getAttribute('data-testid') || '',
+                el.getAttribute('aria-label') || ''
+            ].join(' ').toLowerCase();
+
+            const clone = el.cloneNode(true);
+            const cloneSummary = clone.querySelector('summary');
+            if (cloneSummary) cloneSummary.remove();
+            clone.querySelectorAll('button, svg').forEach((node) => node.remove());
+
+            const content = (clone.innerText || clone.textContent || '').trim();
+            const finalContent = content || summary;
+            if (!finalContent) {
+                return;
+            }
+
+            const type = this.classifyTraceType(summary, hint, finalContent);
+            if (type === 'trace' && el.tagName !== 'DETAILS') {
+                return;
+            }
+
+            const references = this.extractReferences(el);
+
+            traces.push({
+                id: `chatgpt_trace_${index}`,
+                type,
+                summary: summary || (type === 'tool_call' ? 'Tool Call Trace' : type === 'prompt_chain' ? 'Prompt Chain Trace' : 'Reasoning Trace'),
+                content: finalContent,
+                html: el.outerHTML,
+                expanded: el.getAttribute('open') !== null || el.getAttribute('aria-expanded') === 'true',
+                wordCount: finalContent.split(/\s+/).filter(Boolean).length,
+                characterCount: finalContent.length,
+                references: this.hasReferences(references) ? references : undefined
+            });
+        });
+
+        return this.dedupeThinkingBlocks(traces);
+    }
+
+    dedupeThinkingBlocks(blocks) {
+        const deduped = [];
+        const seen = new Map();
+        const priority = { tool_call: 3, prompt_chain: 3, thinking: 2, trace: 1 };
+
+        blocks.forEach((block) => {
+            const summary = (block.summary || '').trim();
+            let normalizedContent = (block.content || '').trim();
+            normalizedContent = normalizedContent.replace(/^(Reasoning|Tool call:[^\n]*|Prompt chain)\s*\n+/i, '').trim();
+
+            if (summary) {
+                const escapedSummary = summary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                normalizedContent = normalizedContent.replace(new RegExp(`^${escapedSummary}\\s*`, 'i'), '').trim();
+            }
+
+            const type = (block.type || 'thinking').trim();
+            const contentSignature = normalizedContent.slice(0, 500);
+            if (!contentSignature) return;
+
+            const existingIndex = seen.get(contentSignature);
+            if (existingIndex !== undefined) {
+                const existing = deduped[existingIndex];
+                const existingPriority = priority[existing.type] || 0;
+                const nextPriority = priority[type] || 0;
+                if (nextPriority <= existingPriority) {
+                    return;
+                }
+                deduped[existingIndex] = {
+                    ...existing,
+                    ...block,
+                    type,
+                    content: normalizedContent || block.content || ''
+                };
+                return;
+            }
+
+            const next = {
+                ...block,
+                type,
+                content: normalizedContent || block.content || ''
+            };
+            deduped.push(next);
+            seen.set(contentSignature, deduped.length - 1);
+        });
+
+        return deduped;
     }
     
     extractMessageId(msgEl) {
@@ -232,6 +352,11 @@ class ChatGPTExtractor extends UniversalExtractor {
     determineAuthor(msgEl) {
         const authorRole = msgEl.getAttribute('data-message-author-role');
         if (authorRole) return authorRole === 'user' ? 'user' : 'assistant';
+
+        const nestedRole = msgEl.querySelector('[data-message-author-role]');
+        if (nestedRole) {
+            return nestedRole.getAttribute('data-message-author-role') === 'user' ? 'user' : 'assistant';
+        }
         
         if (msgEl.querySelector('.user-avatar, .human-avatar')) return 'user';
         if (msgEl.querySelector('.assistant-avatar, .ai-avatar, .chatgpt-avatar')) return 'assistant';
@@ -244,6 +369,15 @@ class ChatGPTExtractor extends UniversalExtractor {
     
     async postProcess() {
         await super.postProcess();
+
+        this.exportData.thinkingBlocks = this.dedupeThinkingBlocks(this.exportData.thinkingBlocks);
+        this.exportData.metadata.thinkingBlockCount = this.exportData.thinkingBlocks.length;
+        this.exportData.metadata.hasThinkingBlocks = this.exportData.thinkingBlocks.length > 0;
+        this.exportData.metadata.blockTypeBreakdown = this.exportData.thinkingBlocks.reduce((counts, block) => {
+            const type = block.type || 'thinking';
+            counts[type] = (counts[type] || 0) + 1;
+            return counts;
+        }, {});
         
         this.exportData.metadata.chatgpt = {
             conversationId: this.exportData.metadata.conversationId,
@@ -251,6 +385,7 @@ class ChatGPTExtractor extends UniversalExtractor {
             codeBlockCount: this.exportData.codeBlocks.length,
             mathExpressionCount: this.exportData.mathExpressions.length,
             regeneratedMessageCount: this.exportData.messages.filter(msg => msg.chatgpt?.isRegenerated).length,
+            reasoningTraceCount: this.exportData.thinkingBlocks.length,
             conversationType: this.determineConversationType(),
             programmingLanguages: this.identifyProgrammingLanguages()
         };

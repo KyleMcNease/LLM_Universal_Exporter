@@ -7,12 +7,16 @@
   "permissions": [
     "activeTab",
     "storage",
-    "downloads"
+    "downloads",
+    "contextMenus",
+    "notifications",
+    "management"
   ],
   
   "host_permissions": [
     "https://claude.ai/*",
     "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
     "https://gemini.google.com/*",
     "https://bard.google.com/*",
     "https://perplexity.ai/*",
@@ -26,7 +30,8 @@
     "https://huggingface.co/*",
     "https://deepseek.com/*",
     "https://qwen.aliyun.com/*",
-    "https://devin.ai/*"
+    "https://devin.ai/*",
+    "http://localhost:7749/*"
   ],
   
   "background": {
@@ -38,6 +43,7 @@
       "matches": [
         "https://claude.ai/*",
         "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
         "https://gemini.google.com/*",
         "https://bard.google.com/*",
         "https://perplexity.ai/*",
@@ -57,7 +63,9 @@
         "libs/jspdf.umd.min.js",
         "libs/html2canvas.min.js",
         "libs/marked.min.js",
+        "libs/docx.umd.js",
         "core/platform-detector.js",
+        "core/turn-watcher.js",
         "extractors/universal-extractor.js",
         "extractors/claude-extractor.js",
         "extractors/chatgpt-extractor.js",

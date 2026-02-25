@@ -8,6 +8,15 @@ class PlatformDetector {
         // Versioned selector system for production resilience
         this.selectorVersions = {
             'claude': {
+                'v2026': {
+                    // Turn wrappers contain one user OR one assistant turn
+                    conversation: '.flex-1.flex.flex-col.max-w-3xl, .max-w-3xl.mx-auto',
+                    turns: '.mb-1.mt-6.group',
+                    messages: '.mb-1.mt-6.group',
+                    userMessages: '[data-testid="user-message"]',
+                    assistantMessages: '.font-claude-response',
+                    thinkingBlocks: 'button[class*="group/status"]'
+                },
                 'v2025': {
                     conversation: '[data-testid="conversation"], .conversation-container',
                     messages: '[data-testid="message"], .message',
@@ -15,33 +24,32 @@ class PlatformDetector {
                     userMessages: '[data-author="user"]',
                     assistantMessages: '[data-author="assistant"]'
                 },
-                'v2024': {
-                    conversation: '.conversation, [role="main"]',
-                    messages: '.message, .chat-message',
-                    thinkingBlocks: '.collapsible, [aria-expanded="false"]',
-                    userMessages: '.user, [data-role="user"]',
-                    assistantMessages: '.assistant, [data-role="assistant"]'
-                },
                 'generic': {
-                    conversation: '[role="main"], .main, .chat',
-                    messages: '.message, [role="message"], .chat-item',
-                    thinkingBlocks: '[aria-expanded], .expandable',
-                    userMessages: '[data-role="user"], .user',
-                    assistantMessages: '[data-role="assistant"], .assistant'
+                    conversation: '[role="main"], .max-w-3xl',
+                    messages: '[data-testid="user-message"], .font-claude-response',
+                    thinkingBlocks: 'button[class*="group/status"], [aria-expanded]',
+                    userMessages: '[data-testid="user-message"]',
+                    assistantMessages: '.font-claude-response'
                 }
             },
             'chatgpt': {
+                'v2026': {
+                    conversation: '[role="main"], main',
+                    messages: 'article[data-testid^="conversation-turn-"], [data-message-author-role], .group',
+                    userMessages: '[data-message-author-role="user"], article[data-message-author-role="user"], [data-testid*="user-message"]',
+                    assistantMessages: '[data-message-author-role="assistant"], article[data-message-author-role="assistant"], [data-testid*="assistant-message"]'
+                },
                 'v2025': {
                     conversation: '[role="main"], .conversation-container',
-                    messages: '[data-message-author-role], .group',
-                    userMessages: '[data-message-author-role="user"]',
-                    assistantMessages: '[data-message-author-role="assistant"]'
+                    messages: 'article[data-testid^="conversation-turn-"], [data-message-author-role], .group',
+                    userMessages: '[data-message-author-role="user"], [data-testid*="user-message"]',
+                    assistantMessages: '[data-message-author-role="assistant"], [data-testid*="assistant-message"]'
                 },
                 'generic': {
                     conversation: '.chat, [role="main"]',
-                    messages: '.message, .chat-message',
-                    userMessages: '.user, [data-role="user"]',
-                    assistantMessages: '.assistant, [data-role="assistant"]'
+                    messages: 'article, .message, .chat-message',
+                    userMessages: '.user, [data-role="user"], [data-message-author-role="user"]',
+                    assistantMessages: '.assistant, [data-role="assistant"], [data-message-author-role="assistant"]'
                 }
             }
         };
@@ -51,22 +59,23 @@ class PlatformDetector {
             'claude': {
                 domains: ['claude.ai'],
                 selectors: {
-                    conversation: '[data-testid="conversation"], .conversation-container',
-                    messages: '[data-testid="message"], .message',
-                    thinkingBlocks: '.thinking-block, [data-thinking], [aria-expanded]',
-                    userMessages: '[data-author="user"]',
-                    assistantMessages: '[data-author="assistant"]'
+                    conversation: '.flex-1.flex.flex-col.max-w-3xl, .max-w-3xl.mx-auto',
+                    turns: '.mb-1.mt-6.group',
+                    messages: '.mb-1.mt-6.group',
+                    userMessages: '[data-testid="user-message"]',
+                    assistantMessages: '.font-claude-response',
+                    thinkingBlocks: 'button[class*="group/status"]'
                 },
                 extractor: 'ClaudeExtractor'
             },
             
             'chatgpt': {
-                domains: ['chat.openai.com'],
+                domains: ['chat.openai.com', 'chatgpt.com'],
                 selectors: {
                     conversation: '[role="main"], .conversation-container',
-                    messages: '[data-message-author-role], .group',
-                    userMessages: '[data-message-author-role="user"]',
-                    assistantMessages: '[data-message-author-role="assistant"]'
+                    messages: 'article[data-testid^="conversation-turn-"], [data-message-author-role], .group',
+                    userMessages: '[data-message-author-role="user"], [data-testid*="user-message"]',
+                    assistantMessages: '[data-message-author-role="assistant"], [data-testid*="assistant-message"]'
                 },
                 extractor: 'ChatGPTExtractor'
             },

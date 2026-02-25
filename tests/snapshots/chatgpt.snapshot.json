@@ -1,0 +1,140 @@
+{
+  "platform": "chatgpt",
+  "messageCount": 2,
+  "thinkingBlockCount": 3,
+  "blockTypeBreakdown": {
+    "thinking": 1,
+    "tool_call": 1,
+    "prompt_chain": 1
+  },
+  "referenceIndex": {
+    "links": [
+      {
+        "url": "https://arxiv.org/pdf/2401.12345.pdf",
+        "title": "architecture-paper.pdf",
+        "domain": "arxiv.org"
+      },
+      {
+        "url": "https://platform.openai.com/docs",
+        "title": "OpenAI docs",
+        "domain": "platform.openai.com"
+      }
+    ],
+    "attachments": [
+      {
+        "name": "runbook.docx",
+        "url": "",
+        "type": "docx"
+      }
+    ],
+    "documents": [
+      {
+        "name": "architecture-paper.pdf",
+        "url": "https://arxiv.org/pdf/2401.12345.pdf",
+        "type": "pdf"
+      },
+      {
+        "name": "runbook.docx",
+        "url": "",
+        "type": "docx"
+      }
+    ],
+    "citations": [
+      {
+        "text": "OpenAI docs",
+        "url": "https://platform.openai.com/docs"
+      }
+    ]
+  },
+  "messages": [
+    {
+      "author": "user",
+      "content": "Can you harden this exporter for production reliability?\n        We uploaded architecture-paper.pdf\n        and a local file\n        runbook.docx.",
+      "thinkingBlocks": [],
+      "references": {
+        "links": [
+          {
+            "url": "https://arxiv.org/pdf/2401.12345.pdf",
+            "title": "architecture-paper.pdf",
+            "domain": "arxiv.org"
+          }
+        ],
+        "attachments": [
+          {
+            "name": "runbook.docx",
+            "url": "",
+            "type": "docx"
+          }
+        ],
+        "documents": [
+          {
+            "name": "architecture-paper.pdf",
+            "url": "https://arxiv.org/pdf/2401.12345.pdf",
+            "type": "pdf"
+          },
+          {
+            "name": "runbook.docx",
+            "url": "",
+            "type": "docx"
+          }
+        ],
+        "citations": []
+      }
+    },
+    {
+      "author": "assistant",
+      "content": "Yes. I added stronger extraction paths, CI checks, and fixture tests.\n        Source citation:\n        OpenAI docs",
+      "thinkingBlocks": [
+        {
+          "type": "thinking",
+          "summary": "",
+          "content": "I will patch selector resilience, add fixture snapshots, and enforce validation checks."
+        },
+        {
+          "type": "tool_call",
+          "summary": "Tool call: test runner",
+          "content": "Ran npm run test-release-gates and captured Output: all checks passed."
+        },
+        {
+          "type": "prompt_chain",
+          "summary": "Prompt chain",
+          "content": "1. Parse artifacts. 2. Map linked docs. 3. Index for memory graph."
+        }
+      ],
+      "references": {
+        "links": [
+          {
+            "url": "https://platform.openai.com/docs",
+            "title": "OpenAI docs",
+            "domain": "platform.openai.com"
+          }
+        ],
+        "attachments": [],
+        "documents": [],
+        "citations": [
+          {
+            "text": "OpenAI docs",
+            "url": "https://platform.openai.com/docs"
+          }
+        ]
+      }
+    }
+  ],
+  "thinkingBlocks": [
+    {
+      "type": "thinking",
+      "summary": "",
+      "content": "I will patch selector resilience, add fixture snapshots, and enforce validation checks."
+    },
+    {
+      "type": "tool_call",
+      "summary": "Tool call: test runner",
+      "content": "Ran npm run test-release-gates and captured Output: all checks passed."
+    },
+    {
+      "type": "prompt_chain",
+      "summary": "Prompt chain",
+      "content": "1. Parse artifacts. 2. Map linked docs. 3. Index for memory graph."
+    }
+  ]
+}

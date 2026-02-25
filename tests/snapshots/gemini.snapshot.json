@@ -1,0 +1,51 @@
+{
+  "platform": "gemini",
+  "messageCount": 2,
+  "thinkingBlockCount": 1,
+  "blockTypeBreakdown": {
+    "thinking": 1
+  },
+  "referenceIndex": {
+    "links": [],
+    "attachments": [],
+    "documents": [],
+    "citations": []
+  },
+  "messages": [
+    {
+      "author": "user",
+      "content": "Summarize what changed in this release.",
+      "thinkingBlocks": [],
+      "references": {
+        "links": [],
+        "attachments": [],
+        "documents": [],
+        "citations": []
+      }
+    },
+    {
+      "author": "assistant",
+      "content": "Reasoning trace\n        Evaluate release notes, extract key fixes, and format by priority.\n      \n      Release includes ChatGPT compatibility, improved block capture, and fixture testing.",
+      "thinkingBlocks": [
+        {
+          "type": "thinking",
+          "summary": "",
+          "content": "Reasoning trace\n        Evaluate release notes, extract key fixes, and format by priority."
+        }
+      ],
+      "references": {
+        "links": [],
+        "attachments": [],
+        "documents": [],
+        "citations": []
+      }
+    }
+  ],
+  "thinkingBlocks": [
+    {
+      "type": "thinking",
+      "summary": "",
+      "content": "Reasoning trace\n        Evaluate release notes, extract key fixes, and format by priority."
+    }
+  ]
+}

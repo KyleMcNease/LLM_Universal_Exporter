@@ -1,0 +1,143 @@
+{
+  "platform": "claude",
+  "messageCount": 2,
+  "thinkingBlockCount": 3,
+  "blockTypeBreakdown": {
+    "thinking": 1,
+    "web_search": 0,
+    "tool_call": 1,
+    "prompt_chain": 1,
+    "code": 0,
+    "file_edit": 0
+  },
+  "referenceIndex": {
+    "links": [
+      {
+        "url": "https://example.com/specs/memory-system.pdf",
+        "title": "memory-system.pdf",
+        "domain": "example.com"
+      },
+      {
+        "url": "https://docs.anthropic.com/en/docs/claude-code",
+        "title": "Anthropic docs",
+        "domain": "docs.anthropic.com"
+      }
+    ],
+    "attachments": [
+      {
+        "name": "team-notes.md",
+        "url": "",
+        "type": "md"
+      }
+    ],
+    "documents": [
+      {
+        "name": "memory-system.pdf",
+        "url": "https://example.com/specs/memory-system.pdf",
+        "type": "pdf"
+      },
+      {
+        "name": "team-notes.md",
+        "url": "",
+        "type": "md"
+      }
+    ],
+    "citations": [
+      {
+        "text": "Anthropic docs",
+        "url": "https://docs.anthropic.com/en/docs/claude-code"
+      }
+    ]
+  },
+  "messages": [
+    {
+      "author": "user",
+      "content": "Build a production-ready export plan for this codebase.\n        Here is our source doc:\n        memory-system.pdf\n        and uploaded notes\n        team-notes.md.",
+      "thinkingBlocks": [],
+      "references": {
+        "links": [
+          {
+            "url": "https://example.com/specs/memory-system.pdf",
+            "title": "memory-system.pdf",
+            "domain": "example.com"
+          }
+        ],
+        "attachments": [
+          {
+            "name": "team-notes.md",
+            "url": "",
+            "type": "md"
+          }
+        ],
+        "documents": [
+          {
+            "name": "memory-system.pdf",
+            "url": "https://example.com/specs/memory-system.pdf",
+            "type": "pdf"
+          },
+          {
+            "name": "team-notes.md",
+            "url": "",
+            "type": "md"
+          }
+        ],
+        "citations": []
+      }
+    },
+    {
+      "author": "assistant",
+      "content": "Here is the hardened implementation and validation strategy.\n                Anthropic docs",
+      "thinkingBlocks": [
+        {
+          "type": "thinking",
+          "summary": "Extended thinking",
+          "content": "I should audit architecture, then patch extractor resilience, then add regression tests."
+        },
+        {
+          "type": "tool_call",
+          "summary": "Ran npm test",
+          "content": "```\nnpm run test\n```\n\n                  Output\n                  All checks passed"
+        },
+        {
+          "type": "prompt_chain",
+          "summary": "Prompt chain",
+          "content": "1) Gather references\n                  2) Expand tool traces\n                  3) Persist conversation graph"
+        }
+      ],
+      "references": {
+        "links": [
+          {
+            "url": "https://docs.anthropic.com/en/docs/claude-code",
+            "title": "Anthropic docs",
+            "domain": "docs.anthropic.com"
+          }
+        ],
+        "attachments": [],
+        "documents": [],
+        "citations": [
+          {
+            "text": "Anthropic docs",
+            "url": "https://docs.anthropic.com/en/docs/claude-code"
+          }
+        ]
+      }
+    }
+  ],
+  "thinkingBlocks": [
+    {
+      "type": "thinking",
+      "summary": "Extended thinking",
+      "content": "I should audit architecture, then patch extractor resilience, then add regression tests."
+    },
+    {
+      "type": "tool_call",
+      "summary": "Ran npm test",
+      "content": "```\nnpm run test\n```\n\n                  Output\n                  All checks passed"
+    },
+    {
+      "type": "prompt_chain",
+      "summary": "Prompt chain",
+      "content": "1) Gather references\n                  2) Expand tool traces\n                  3) Persist conversation graph"
+    }
+  ]
+}
