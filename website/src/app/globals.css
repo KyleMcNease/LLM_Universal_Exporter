@@ -1,0 +1,315 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+:root {
+  --background: #081426;
+  --foreground: #eef3fb;
+  --landing-bg: radial-gradient(circle at 15% 0%, #143559 0%, #0a192f 52%, #081426 100%);
+  --landing-surface: #112a45;
+  --landing-surface-strong: #183a5f;
+  --landing-muted: #a9b8d2;
+  --landing-accent: #00bfa6;
+  --landing-highlight: #ffbf00;
+  --landing-radius: 12px;
+  --landing-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+  --landing-max-width: 1200px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', 'Avenir Next', 'Segoe UI', sans-serif;
+}
+
+.landing-shell {
+  background: var(--landing-bg);
+  color: var(--foreground);
+}
+
+.landing-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 1rem 2rem;
+  background: rgba(2, 10, 22, 0.72);
+  backdrop-filter: blur(12px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.landing-logo {
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: var(--landing-accent);
+}
+
+.landing-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.landing-nav-link {
+  color: var(--landing-muted);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+.landing-nav-link:hover {
+  color: var(--landing-accent);
+}
+
+.landing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.72rem 1.35rem;
+  border-radius: 10px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.landing-btn:hover {
+  transform: translateY(-1px);
+}
+
+.landing-btn-primary {
+  background: var(--landing-accent);
+  color: #042223;
+  box-shadow: 0 8px 20px rgba(0, 191, 166, 0.24);
+}
+
+.landing-btn-primary:hover {
+  background: #00d4b8;
+}
+
+.landing-btn-secondary {
+  border: 2px solid var(--landing-accent);
+  color: var(--landing-accent);
+}
+
+.landing-btn-secondary:hover {
+  background: rgba(0, 191, 166, 0.14);
+}
+
+.landing-section {
+  max-width: var(--landing-max-width);
+  margin: 0 auto;
+  padding: 4rem 1rem;
+}
+
+.landing-hero {
+  padding: 160px 1rem 4rem;
+}
+
+.landing-center {
+  text-align: center;
+}
+
+.landing-title {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 1rem;
+}
+
+.landing-highlight {
+  color: var(--landing-highlight);
+}
+
+.landing-subtitle {
+  max-width: 680px;
+  margin: 0 auto 2rem;
+  font-size: 1.15rem;
+  color: var(--landing-muted);
+}
+
+.landing-actions {
+  display: flex;
+  gap: 0.9rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.landing-block-header {
+  margin-bottom: 2.6rem;
+}
+
+.landing-h2 {
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+}
+
+.landing-body {
+  max-width: 620px;
+  margin: 0 auto;
+  color: var(--landing-muted);
+  font-size: 1.05rem;
+}
+
+.landing-fallback {
+  background: var(--landing-surface);
+  border-radius: var(--landing-radius);
+}
+
+.landing-fallback-short {
+  height: 200px;
+}
+
+.landing-fallback-tall {
+  height: 300px;
+}
+
+.landing-features-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.landing-feature-card {
+  background: linear-gradient(170deg, rgba(17, 42, 69, 0.95) 0%, rgba(10, 28, 47, 0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--landing-radius);
+  padding: 1.5rem;
+  box-shadow: var(--landing-shadow);
+  transition: transform 0.18s ease, border-color 0.18s ease;
+  position: relative;
+}
+
+.landing-feature-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 191, 166, 0.42);
+}
+
+.landing-feature-card.is-highlight {
+  border-left: 4px solid var(--landing-highlight);
+}
+
+.landing-feature-card.is-coming-soon {
+  opacity: 0.86;
+}
+
+.landing-feature-card h3 {
+  font-size: 1.2rem;
+  margin-bottom: 0.6rem;
+  font-weight: 700;
+}
+
+.landing-feature-card p {
+  color: var(--landing-muted);
+  font-size: 0.95rem;
+}
+
+.landing-pill {
+  display: inline-block;
+  padding: 0.24rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  background: var(--landing-highlight);
+  color: #1d1a08;
+}
+
+.landing-feature-card .landing-pill {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+}
+
+.landing-pricing-grid {
+  display: grid;
+  gap: 1.2rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.landing-pricing-card {
+  background: linear-gradient(170deg, rgba(17, 42, 69, 0.95) 0%, rgba(10, 28, 47, 0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--landing-radius);
+  padding: 1.6rem;
+  text-align: center;
+  box-shadow: var(--landing-shadow);
+  position: relative;
+}
+
+.landing-pricing-card.featured {
+  border-color: rgba(0, 191, 166, 0.64);
+}
+
+.landing-pricing-card h3 {
+  font-size: 1.45rem;
+  color: var(--landing-accent);
+  font-weight: 700;
+}
+
+.landing-pricing-card .price {
+  font-size: 2.35rem;
+  font-weight: 800;
+  margin-top: 0.45rem;
+}
+
+.landing-pricing-card .period {
+  color: var(--landing-muted);
+  margin-bottom: 1.1rem;
+}
+
+.landing-footer {
+  background: #001f3f;
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--landing-muted);
+  font-size: 0.875rem;
+}
+
+.landing-footer a {
+  color: var(--landing-accent);
+  text-decoration: none;
+}
+
+.landing-footer a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .landing-header {
+    padding: 0.8rem 1rem;
+  }
+
+  .landing-nav {
+    gap: 0.8rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .landing-nav a[href="#features"],
+  .landing-nav a[href="#pricing"] {
+    display: none;
+  }
+
+  .landing-hero {
+    padding-top: 120px;
+  }
+}
