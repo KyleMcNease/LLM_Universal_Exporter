@@ -15,7 +15,8 @@ class UniversalExtractor {
             metadata: {
                 platform: this.platform,
                 url: window.location.href,
-                title: document.title,
+                title: this.extractConversationTitle(),
+                rawDocumentTitle: document.title,
                 exportDate: this.timestamp,
                 exporterVersion: this.version,
                 userAgent: navigator.userAgent,
@@ -34,6 +35,84 @@ class UniversalExtractor {
                 expanded: null
             }
         };
+    }
+
+    cleanTitleCandidate(value) {
+        if (typeof value !== 'string') return '';
+        let title = value.replace(/\s+/g, ' ').trim();
+        if (!title) return '';
+
+        // Remove common AI brand suffixes from document titles.
+        title = title
+            .replace(/\s+[-|:]\s*(ChatGPT|OpenAI)\s*$/i, '')
+            .replace(/\s+[-|:]\s*Claude\s*$/i, '')
+            .replace(/\s+[-|:]\s*Gemini\s*$/i, '')
+            .replace(/\s+[-|:]\s*Perplexity\s*$/i, '')
+            .replace(/\s+[-|:]\s*Grok\s*$/i, '')
+            .replace(/\s+[-|:]\s*Qwen.*$/i, '')
+            .replace(/\s+[-|:]\s*DeepSeek\s*$/i, '')
+            .replace(/\s+[-|:]\s*Bing(?:\s+Chat)?\s*$/i, '')
+            .trim();
+
+        return title;
+    }
+
+    isPlaceholderTitle(value) {
+        if (typeof value !== 'string') return true;
+        const normalized = value.trim().toLowerCase();
+        if (!normalized) return true;
+        const placeholders = new Set([
+            'chatgpt',
+            'claude',
+            'gemini',
+            'perplexity',
+            'grok',
+            'qwen',
+            'deepseek',
+            'bing',
+            'new chat',
+            'new conversation',
+            'untitled',
+            'conversation'
+        ]);
+        return placeholders.has(normalized);
+    }
+
+    extractConversationTitle() {
+        const selectors = [
+            '[data-testid="conversation-title"]',
+            '[data-testid*="conversation-title"]',
+            '[data-testid*="chat-title"]',
+            '[aria-label*="conversation title" i]',
+            '.conversation-title',
+            '.chat-title',
+            '.thread-title',
+            'main h1',
+            'header h1',
+            'h1'
+        ];
+
+        for (const selector of selectors) {
+            const node = this.safeQuerySelector(selector);
+            const text = this.cleanTitleCandidate(node?.textContent || '');
+            if (text && !this.isPlaceholderTitle(text) && text.length > 2) {
+                return text;
+            }
+        }
+
+        const ogTitle = this.cleanTitleCandidate(
+            document.querySelector('meta[property="og:title"]')?.getAttribute('content') || ''
+        );
+        if (ogTitle && !this.isPlaceholderTitle(ogTitle)) {
+            return ogTitle;
+        }
+
+        const docTitle = this.cleanTitleCandidate(document.title || '');
+        if (docTitle) {
+            return docTitle;
+        }
+
+        return 'conversation-export';
     }
 
     isValidSelector(selector) {

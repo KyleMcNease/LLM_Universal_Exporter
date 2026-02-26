@@ -10,6 +10,7 @@ class ExportInterface {
         this.extractor = null;
         this.exportData = null;
         this.platformInfo = null;
+        this.filenameManuallyEdited = false;
         
         this.formats = {
             'pdf': {
@@ -187,7 +188,7 @@ class ExportInterface {
 
                     <div class="uae-filename-group">
                         <label for="filename-template">Filename Template:</label>
-                        <input type="text" id="filename-template" value="{base}-{platform}-{date}-{scope}" aria-label="Filename template" />
+                        <input type="text" id="filename-template" value="{base}" aria-label="Filename template" />
                         <small class="uae-helper">{base} {platform} {date} {time} {scope}</small>
                     </div>
 
@@ -325,6 +326,12 @@ class ExportInterface {
                 this.updateScopeControls();
             }
         });
+
+        document.addEventListener('input', (e) => {
+            if (e.target?.id === 'export-filename') {
+                this.filenameManuallyEdited = true;
+            }
+        });
     }
     
     async analyzeConversation() {
@@ -336,6 +343,7 @@ class ExportInterface {
             
             this.exportData = await this.extractor.extractConversation();
             this.normalizeAndValidateExportData();
+            this.autoPopulateFilenameFromTitle();
             
             this.updateStatus('Analysis complete!', 100);
             this.showResults();
@@ -1670,13 +1678,13 @@ class ExportInterface {
         const scope = document.getElementById('export-scope')?.value || 'all';
         const scopeStart = this.parsePositiveInt(document.getElementById('scope-start')?.value);
         const scopeEnd = this.parsePositiveInt(document.getElementById('scope-end')?.value);
-        const template = document.getElementById('filename-template')?.value || '{base}-{platform}-{date}-{scope}';
+        const template = document.getElementById('filename-template')?.value || '{base}';
         return {
             includeThinking: document.getElementById('include-thinking')?.checked ?? true,
             includeMetadata: document.getElementById('include-metadata')?.checked ?? true,
             includeHtml: document.getElementById('include-html')?.checked ?? true,
             redactSensitive: document.getElementById('redact-sensitive')?.checked ?? false,
-            filename: document.getElementById('export-filename')?.value || 'conversation-export',
+            filename: document.getElementById('export-filename')?.value || this.getConversationTitleBase() || 'conversation-export',
             filenameTemplate: template,
             scope,
             scopeStart,
@@ -1687,6 +1695,31 @@ class ExportInterface {
             pdfFontScale: Number(document.getElementById('pdf-font-scale')?.value || '1')
         };
     }
+
+    sanitizeFilenameBase(value) {
+        if (typeof value !== 'string') return '';
+        return value
+            .trim()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-zA-Z0-9._-]/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^[-_.]+|[-_.]+$/g, '');
+    }
+
+    getConversationTitleBase() {
+        const title = this.exportData?.metadata?.title || this.exportData?.metadata?.rawDocumentTitle || '';
+        const sanitized = this.sanitizeFilenameBase(title);
+        return sanitized || 'conversation-export';
+    }
+
+    autoPopulateFilenameFromTitle() {
+        const input = document.getElementById('export-filename');
+        if (!input || this.filenameManuallyEdited) return;
+        const suggestedBase = this.getConversationTitleBase();
+        if (!suggestedBase || suggestedBase === 'conversation-export') return;
+        input.value = suggestedBase;
+        input.placeholder = suggestedBase;
+    }
     
     getFilename(format) {
         const options = this.getExportOptions();
@@ -1696,7 +1729,7 @@ class ExportInterface {
         const time = now.toISOString().slice(11, 19).replace(/:/g, '-');
         const scopeLabel = this.resolveMessageRange(options, this.exportData?.messages?.length || 1).label;
         const platform = this.exportData?.metadata?.platform || this.platformInfo?.platform || 'platform';
-        const template = options.filenameTemplate || '{base}-{platform}-{date}-{scope}';
+        const template = options.filenameTemplate || '{base}';
         
         const extensions = {
             'pdf': 'pdf',
