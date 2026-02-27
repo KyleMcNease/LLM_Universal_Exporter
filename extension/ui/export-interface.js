@@ -548,6 +548,39 @@ class ExportInterface {
         const total = combined.links.length + combined.attachments.length + combined.documents.length + combined.citations.length;
         return { ...combined, total };
     }
+
+    formatPlatformName(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        const map = {
+            chatgpt: 'GPT',
+            claude: 'Claude',
+            gemini: 'Gemini',
+            grok: 'Grok',
+            perplexity: 'Perplexity',
+            qwen3: 'Qwen',
+            deepseek: 'DeepSeek',
+            llama: 'Llama',
+            bing: 'Bing',
+            poe: 'Poe',
+            manus: 'Manus',
+            devin: 'Devin',
+            character: 'Character.AI'
+        };
+        if (map[normalized]) return map[normalized];
+        if (!normalized) return 'Assistant';
+        return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    }
+
+    getAssistantLabel(sourceData = this.exportData) {
+        const platform = sourceData?.metadata?.platform || this.platformInfo?.platform || '';
+        return this.formatPlatformName(platform);
+    }
+
+    getAuthorLabel(author, sourceData = this.exportData) {
+        const normalized = String(author || '').trim().toLowerCase();
+        if (normalized === 'user') return 'User';
+        return this.getAssistantLabel(sourceData);
+    }
     
     async generatePDF(options) {
         try {
@@ -612,7 +645,7 @@ class ExportInterface {
                     // Message header
                     doc.setFontSize(Math.round(10 * scale));
                     doc.setFont(undefined, 'bold');
-                    doc.text(`${message.author.toUpperCase()}:`, 20, yPosition);
+                    doc.text(`${this.getAuthorLabel(message.author, scoped).toUpperCase()}:`, 20, yPosition);
                     
                     // Message content
                     doc.setFont(undefined, 'normal');
@@ -706,7 +739,7 @@ class ExportInterface {
             children.push(
                 new Paragraph({
                     heading: HeadingLevel.HEADING_2,
-                    children: [new TextRun(message.author.toUpperCase())]
+                    children: [new TextRun(this.getAuthorLabel(message.author, scoped).toUpperCase())]
                 }),
                 new Paragraph(message.content || '')
             );
@@ -850,7 +883,7 @@ class ExportInterface {
         md += `\n---\n\n`;
 
         scoped.messages.forEach(message => {
-            md += `## ${message.author.charAt(0).toUpperCase() + message.author.slice(1)}\n\n`;
+            md += `## ${this.getAuthorLabel(message.author, scoped)}\n\n`;
 
             if (options.includeThinking && message.thinkingBlocks && message.thinkingBlocks.length > 0) {
                 message.thinkingBlocks.forEach(block => {
@@ -1078,13 +1111,14 @@ class ExportInterface {
         
         scoped.messages.forEach(message => {
             const content = message.content.replace(/"/g, '""');
-            csv += `"${message.id}","${message.author}","message","${content}","${message.wordCount || 0}","${message.timestamp}"\n`;
+            const authorLabel = this.getAuthorLabel(message.author, scoped).replace(/"/g, '""');
+            csv += `"${message.id}","${authorLabel}","message","${content}","${message.wordCount || 0}","${message.timestamp}"\n`;
             
             if (options.includeThinking && message.thinkingBlocks) {
                 message.thinkingBlocks.forEach(block => {
                     const thinkingContent = block.content.replace(/"/g, '""');
                     const type = block.type || 'thinking';
-                    csv += `"${block.id}","${message.author}","${type}","${thinkingContent}","${block.wordCount || 0}","${message.timestamp}"\n`;
+                    csv += `"${block.id}","${authorLabel}","${type}","${thinkingContent}","${block.wordCount || 0}","${message.timestamp}"\n`;
                 });
             }
         });
@@ -1163,7 +1197,7 @@ class ExportInterface {
 
     ${scoped.messages.map(message => `
         <div class="message ${message.author}">
-            <h2>${message.author === 'user' ? 'User' : 'Assistant'}</h2>
+            <h2>${this.escapeHtml(this.getAuthorLabel(message.author, scoped))}</h2>
 
             ${options.includeThinking && message.thinkingBlocks && message.thinkingBlocks.length > 0 ?
                 message.thinkingBlocks.map(block => this.renderBlock(block)).join('')
@@ -1321,7 +1355,7 @@ class ExportInterface {
         text += `\n${'='.repeat(60)}\n\n`;
 
         scoped.messages.forEach(message => {
-            text += `${message.author.toUpperCase()}:\n`;
+            text += `${this.getAuthorLabel(message.author, scoped).toUpperCase()}:\n`;
 
             if (options.includeThinking && message.thinkingBlocks && message.thinkingBlocks.length > 0) {
                 message.thinkingBlocks.forEach(block => {

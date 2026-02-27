@@ -157,6 +157,8 @@ class UniversalExtractor {
                 platform: this.platform,
                 options
             });
+
+            await this.hydrateConversationHistory();
             
             await this.captureOriginalState();
             
@@ -179,6 +181,110 @@ class UniversalExtractor {
         } catch (error) {
             console.error('❌ Extraction failed:', error);
             throw new Error(`Extraction failed: ${error.message}`);
+        }
+    }
+
+    getScrollableElement() {
+        const candidates = [];
+        const pushCandidate = (el) => {
+            if (!el || !(el instanceof Element) || candidates.includes(el)) return;
+            candidates.push(el);
+        };
+
+        pushCandidate(this.safeQuerySelector(this.selectors.conversation));
+        pushCandidate(document.querySelector('[role="main"]'));
+        pushCandidate(document.querySelector('main'));
+        pushCandidate(document.scrollingElement);
+        pushCandidate(document.documentElement);
+        pushCandidate(document.body);
+
+        let best = null;
+        let bestOverflow = 0;
+        candidates.forEach((el) => {
+            const scrollHeight = Number(el.scrollHeight || 0);
+            const clientHeight = Number(el.clientHeight || 0);
+            const overflow = scrollHeight - clientHeight;
+            if (overflow > bestOverflow && overflow > 200) {
+                best = el;
+                bestOverflow = overflow;
+            }
+        });
+
+        return best;
+    }
+
+    scrollElementTo(el, top) {
+        if (!el) return;
+        if (typeof el.scrollTo === 'function') {
+            el.scrollTo({ top, behavior: 'auto' });
+            return;
+        }
+        el.scrollTop = top;
+    }
+
+    currentMessageElementCount() {
+        const selector = this.getSelector(this.selectors.messages);
+        if (!selector) return 0;
+
+        const conversation = this.safeQuerySelector(this.selectors.conversation);
+        let count = 0;
+        if (conversation) {
+            count = this.safeQuerySelectorAll(selector, conversation).length;
+        }
+        if (!count) {
+            count = this.safeQuerySelectorAll(selector).length;
+        }
+        return count;
+    }
+
+    async hydrateConversationHistory() {
+        const scrollable = this.getScrollableElement();
+        if (!scrollable) return;
+
+        const initialCount = this.currentMessageElementCount();
+        if (initialCount <= 1) return;
+
+        const originalTop = Number(scrollable.scrollTop || 0);
+        let previousBestCount = initialCount;
+        let stableAtTop = 0;
+
+        // Start from the bottom (latest turns), then page upward to force
+        // virtualized UIs to materialize older turns.
+        const maxTop = Math.max(0, Number(scrollable.scrollHeight || 0) - Number(scrollable.clientHeight || 0));
+        this.scrollElementTo(scrollable, maxTop);
+        await this.wait(120);
+
+        for (let step = 0; step < 160; step++) {
+            const clientHeight = Number(scrollable.clientHeight || 0);
+            const delta = Math.max(240, Math.round(clientHeight * 0.85));
+            const currentTop = Number(scrollable.scrollTop || 0);
+            const nextTop = Math.max(0, currentTop - delta);
+
+            this.scrollElementTo(scrollable, nextTop);
+            await this.wait(120);
+
+            const count = this.currentMessageElementCount();
+            if (count > previousBestCount) {
+                previousBestCount = count;
+                stableAtTop = 0;
+            } else if (nextTop === 0) {
+                stableAtTop += 1;
+            }
+
+            if (nextTop === 0 && stableAtTop >= 5) {
+                break;
+            }
+        }
+
+        // Return to bottom so extraction reads the final rendered state.
+        const finalMaxTop = Math.max(0, Number(scrollable.scrollHeight || 0) - Number(scrollable.clientHeight || 0));
+        this.scrollElementTo(scrollable, finalMaxTop);
+        await this.wait(120);
+
+        // If nothing changed and we were not near the bottom originally, restore.
+        if (previousBestCount <= initialCount && originalTop < finalMaxTop) {
+            this.scrollElementTo(scrollable, originalTop);
+            await this.wait(80);
         }
     }
     

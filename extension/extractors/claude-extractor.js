@@ -100,6 +100,8 @@ class ClaudeExtractor extends UniversalExtractor {
         try {
             console.log('🚀 Claude Extractor (Enhanced): Starting turn-based extraction...');
 
+            await this.hydrateConversationHistory();
+
             await this.captureOriginalState();
 
             // Step 1 — expand ALL collapsible blocks before extraction
