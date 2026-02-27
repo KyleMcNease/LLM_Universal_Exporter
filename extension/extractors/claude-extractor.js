@@ -241,7 +241,10 @@ class ClaudeExtractor extends UniversalExtractor {
         const content = this.getCleanText(msgEl);
         if (!content.trim()) return null;
 
-        const references = this.extractReferences(msgEl);
+        const references = this.mergeReferences(
+            this.extractReferences(msgEl),
+            this.extractReferences(wrapper)
+        );
 
         const message = {
             id: `msg_${index}`,

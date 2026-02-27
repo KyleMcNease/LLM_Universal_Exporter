@@ -736,6 +736,13 @@ class UniversalExtractor {
         return docExt.has(ext) ? ext : null;
     }
 
+    parseFileSizeLabel(value) {
+        if (!value || typeof value !== 'string') return null;
+        const match = value.match(/(\d+(?:\.\d+)?)\s*(B|KB|MB|GB|TB)\b/i);
+        if (!match) return null;
+        return `${match[1]} ${match[2].toUpperCase()}`;
+    }
+
     normalizeAbsoluteUrl(rawUrl) {
         if (!rawUrl || typeof rawUrl !== 'string') return null;
         try {
@@ -806,18 +813,23 @@ class UniversalExtractor {
 
         const attachmentNodes = this.safeQuerySelectorAll(attachmentSelectors, element);
         attachmentNodes.forEach((node) => {
+            const rawText = (node.innerText || node.textContent || '').trim();
             const name = (
                 node.getAttribute('data-file-name') ||
                 node.getAttribute('data-filename') ||
                 node.getAttribute('aria-label') ||
-                node.innerText ||
-                node.textContent ||
+                rawText ||
                 ''
             ).trim();
 
             const linked = node.tagName === 'A'
                 ? this.normalizeAbsoluteUrl(node.getAttribute('href'))
                 : this.normalizeAbsoluteUrl(node.querySelector('a[href]')?.getAttribute('href'));
+            const sizeLabel = this.parseFileSizeLabel(
+                node.getAttribute('data-file-size') ||
+                node.getAttribute('data-size') ||
+                rawText
+            );
 
             if (!name && !linked) return;
 
@@ -825,14 +837,16 @@ class UniversalExtractor {
             references.attachments.push({
                 name: name || (linked ? linked.split('/').pop() : 'attachment'),
                 url: linked || null,
-                type: type || 'file'
+                type: type || 'file',
+                sizeLabel: sizeLabel || null
             });
 
             if (type) {
                 references.documents.push({
                     name: name || (linked ? linked.split('/').pop() : 'document'),
                     url: linked || null,
-                    type
+                    type,
+                    sizeLabel: sizeLabel || null
                 });
             }
         });
@@ -937,6 +951,39 @@ class UniversalExtractor {
             total: totals
         };
     }
+
+    extractUploadedDocumentsFromMessages(messages) {
+        const docs = [];
+        (messages || []).forEach((message) => {
+            if ((message.author || '').toLowerCase() !== 'user') return;
+            const refs = message.references;
+            if (!refs || typeof refs !== 'object') return;
+
+            const fromAttachments = Array.isArray(refs.attachments) ? refs.attachments : [];
+            const fromDocuments = Array.isArray(refs.documents) ? refs.documents : [];
+            const combined = [...fromAttachments, ...fromDocuments];
+
+            combined.forEach((item) => {
+                const name = (item?.name || '').trim();
+                const url = item?.url || null;
+                const type = item?.type || this.classifyDocumentType(name || url || '') || 'file';
+                if (!name && !url) return;
+                docs.push({
+                    messageId: message.id || null,
+                    author: 'user',
+                    name: name || (url ? String(url).split('/').pop() : 'document'),
+                    type,
+                    url,
+                    sizeLabel: item?.sizeLabel || null
+                });
+            });
+        });
+
+        return this.dedupeObjectsBySignature(
+            docs,
+            (item) => `${item.messageId || ''}|${item.name || ''}|${item.url || ''}|${item.type || ''}|${item.sizeLabel || ''}`
+        );
+    }
     
     async postProcess() {
         this.exportData.metadata.messageCount = this.exportData.messages.length;
@@ -961,6 +1008,8 @@ class UniversalExtractor {
         this.exportData.metadata.linkCount = referenceIndex.links.length;
         this.exportData.metadata.attachmentCount = referenceIndex.attachments.length;
         this.exportData.metadata.citationCount = referenceIndex.citations.length;
+        this.exportData.metadata.uploadedDocuments = this.extractUploadedDocumentsFromMessages(this.exportData.messages);
+        this.exportData.metadata.uploadedDocumentCount = this.exportData.metadata.uploadedDocuments.length;
         
         const firstMessageContent = this.exportData.messages[0]?.content;
         const lastMessageContent = this.exportData.messages[this.exportData.messages.length - 1]?.content;

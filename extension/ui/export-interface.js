@@ -494,6 +494,8 @@ class ExportInterface {
         scopedMetadata.linkCount = referenceIndex.links.length;
         scopedMetadata.attachmentCount = referenceIndex.attachments.length;
         scopedMetadata.citationCount = referenceIndex.citations.length;
+        scopedMetadata.uploadedDocuments = this.computeUploadedDocumentsFromMessages(scopedMessages);
+        scopedMetadata.uploadedDocumentCount = scopedMetadata.uploadedDocuments.length;
 
         return {
             ...this.exportData,
@@ -547,6 +549,34 @@ class ExportInterface {
 
         const total = combined.links.length + combined.attachments.length + combined.documents.length + combined.citations.length;
         return { ...combined, total };
+    }
+
+    computeUploadedDocumentsFromMessages(messages) {
+        const docs = [];
+        (messages || []).forEach((message) => {
+            if ((message.author || '').toLowerCase() !== 'user') return;
+            const refs = this.normalizeReferenceSet(message.references);
+            const combined = [...refs.attachments, ...refs.documents];
+            combined.forEach((item) => {
+                const name = (item?.name || '').trim();
+                const url = item?.url || null;
+                const type = item?.type || 'file';
+                if (!name && !url) return;
+                docs.push({
+                    messageId: message.id || null,
+                    author: 'user',
+                    name: name || (url ? String(url).split('/').pop() : 'document'),
+                    type,
+                    url,
+                    sizeLabel: item?.sizeLabel || null
+                });
+            });
+        });
+
+        return this.dedupeBySignature(
+            docs,
+            (item) => `${item.messageId || ''}|${item.name || ''}|${item.url || ''}|${item.type || ''}|${item.sizeLabel || ''}`
+        );
     }
 
     formatPlatformName(value) {
@@ -806,12 +836,14 @@ class ExportInterface {
             attachments: source.attachments.map((item) => ({
                 ...item,
                 name: this.redactFilename(this.applySensitiveRedaction(item.name || '')),
-                url: this.redactUrl(item.url || '')
+                url: this.redactUrl(item.url || ''),
+                sizeLabel: this.applySensitiveRedaction(item.sizeLabel || '')
             })),
             documents: source.documents.map((item) => ({
                 ...item,
                 name: this.redactFilename(this.applySensitiveRedaction(item.name || '')),
-                url: this.redactUrl(item.url || '')
+                url: this.redactUrl(item.url || ''),
+                sizeLabel: this.applySensitiveRedaction(item.sizeLabel || '')
             })),
             citations: source.citations.map((item) => ({
                 ...item,
@@ -854,6 +886,15 @@ class ExportInterface {
             clone.metadata.referenceIndex = this.redactReferenceSet(clone.metadata.referenceIndex);
         }
 
+        if (clone.metadata && Array.isArray(clone.metadata.uploadedDocuments)) {
+            clone.metadata.uploadedDocuments = clone.metadata.uploadedDocuments.map((item) => ({
+                ...item,
+                name: this.redactFilename(this.applySensitiveRedaction(item.name || '')),
+                url: this.redactUrl(item.url || ''),
+                sizeLabel: this.applySensitiveRedaction(item.sizeLabel || '')
+            }));
+        }
+
         if (clone.rawHtml) {
             clone.rawHtml = {
                 original: options.includeHtml ? this.applySensitiveRedaction(clone.rawHtml.original || '') : null,
@@ -879,6 +920,9 @@ class ExportInterface {
         if (options.includeThinking && scoped.metadata.thinkingBlockCount > 0) {
             md += `**Blocks:** ${scoped.metadata.thinkingBlockCount} (${this.formatBlockBreakdown(scoped)})\n`;
         }
+        if ((scoped.metadata.uploadedDocumentCount || 0) > 0) {
+            md += `**Uploaded Documents:** ${scoped.metadata.uploadedDocumentCount}\n`;
+        }
 
         md += `\n---\n\n`;
 
@@ -897,6 +941,20 @@ class ExportInterface {
         if (options.includeMetadata) {
             md += `\n## Export Metadata\n\n`;
             md += `\`\`\`json\n${JSON.stringify(scoped.metadata, null, 2)}\n\`\`\`\n`;
+        }
+
+        if ((scoped.metadata.uploadedDocumentCount || 0) > 0) {
+            md += `\n## Uploaded Documents\n\n`;
+            scoped.metadata.uploadedDocuments.forEach((doc) => {
+                const size = doc.sizeLabel ? ` • ${doc.sizeLabel}` : '';
+                const url = doc.url || '';
+                if (url) {
+                    md += `- ${doc.name} (${doc.type}${size}) — ${url}\n`;
+                } else {
+                    md += `- ${doc.name} (${doc.type}${size})\n`;
+                }
+            });
+            md += '\n';
         }
 
         return md;
@@ -1122,6 +1180,14 @@ class ExportInterface {
                 });
             }
         });
+
+        (scoped.metadata.uploadedDocuments || []).forEach((doc, index) => {
+            const content = [doc.name || 'document', doc.type || 'file', doc.sizeLabel || '', doc.url || '']
+                .filter(Boolean)
+                .join(' | ')
+                .replace(/"/g, '""');
+            csv += `"upload_${index}","User","uploaded_document","${content}","0",""\n`;
+        });
         
         return csv;
     }
@@ -1193,6 +1259,7 @@ class ExportInterface {
         <strong>Date:</strong> ${scoped.metadata.exportDate}<br>
         <strong>Messages:</strong> ${scoped.metadata.messageCount}<br>
         ${options.includeThinking ? `<strong>Blocks:</strong> ${scoped.metadata.thinkingBlockCount} (${this.formatBlockBreakdown(scoped)})<br>` : ''}
+        ${(scoped.metadata.uploadedDocumentCount || 0) > 0 ? `<strong>Uploaded Documents:</strong> ${scoped.metadata.uploadedDocumentCount}<br>` : ''}
     </div>
 
     ${scoped.messages.map(message => `
@@ -1206,6 +1273,20 @@ class ExportInterface {
             <div class="response-content">${this.escapeHtml(message.content)}</div>
         </div>
     `).join('')}
+
+    ${(scoped.metadata.uploadedDocumentCount || 0) > 0 ? `
+    <h2>Uploaded Documents</h2>
+    <div class="metadata">
+        ${(scoped.metadata.uploadedDocuments || []).map((doc) => {
+            const size = doc.sizeLabel ? ` • ${this.escapeHtml(doc.sizeLabel)}` : '';
+            const label = `${this.escapeHtml(doc.name || 'document')} (${this.escapeHtml(doc.type || 'file')}${size})`;
+            if (doc.url) {
+                return `<div><a href="${this.escapeHtml(doc.url)}" target="_blank" rel="noopener">${label}</a></div>`;
+            }
+            return `<div>${label}</div>`;
+        }).join('')}
+    </div>
+    ` : ''}
 
     <div class="metadata">
         Generated by Universal AI Exporter v${this.version} (Enhanced)
@@ -1352,6 +1433,9 @@ class ExportInterface {
         if (options.includeThinking && scoped.metadata.thinkingBlockCount > 0) {
             text += `Blocks: ${scoped.metadata.thinkingBlockCount} (${this.formatBlockBreakdown(scoped)})\n`;
         }
+        if ((scoped.metadata.uploadedDocumentCount || 0) > 0) {
+            text += `Uploaded Documents: ${scoped.metadata.uploadedDocumentCount}\n`;
+        }
         text += `\n${'='.repeat(60)}\n\n`;
 
         scoped.messages.forEach(message => {
@@ -1396,6 +1480,16 @@ class ExportInterface {
             text += `${message.content}\n\n`;
             text += `${'-'.repeat(40)}\n\n`;
         });
+
+        if ((scoped.metadata.uploadedDocumentCount || 0) > 0) {
+            text += `UPLOADED DOCUMENTS:\n`;
+            (scoped.metadata.uploadedDocuments || []).forEach((doc) => {
+                const size = doc.sizeLabel ? ` | ${doc.sizeLabel}` : '';
+                const url = doc.url ? ` | ${doc.url}` : '';
+                text += `- ${doc.name || 'document'} | ${doc.type || 'file'}${size}${url}\n`;
+            });
+            text += '\n';
+        }
 
         return text;
     }
@@ -1629,6 +1723,8 @@ class ExportInterface {
         metadata.linkCount = referenceIndex.links.length;
         metadata.attachmentCount = referenceIndex.attachments.length;
         metadata.citationCount = referenceIndex.citations.length;
+        metadata.uploadedDocuments = this.computeUploadedDocumentsFromMessages(this.exportData.messages);
+        metadata.uploadedDocumentCount = metadata.uploadedDocuments.length;
 
         this.exportData.metadata = metadata;
 
@@ -1673,6 +1769,10 @@ class ExportInterface {
             <div class="uae-stat">
                 <span class="stat-label">References:</span>
                 <span class="stat-value">${this.exportData.metadata.referenceCount || 0}</span>
+            </div>
+            <div class="uae-stat">
+                <span class="stat-label">Uploads:</span>
+                <span class="stat-value">${this.exportData.metadata.uploadedDocumentCount || 0}</span>
             </div>
             <div class="uae-stat">
                 <span class="stat-label">Platform:</span>
